@@ -324,7 +324,8 @@ export class AdminService {
     const lastPaidByUser = new Map<string, Date>();
     for (const p of paidPayments) if (p.paidAt && !lastPaidByUser.has(p.payerUserId)) lastPaidByUser.set(p.payerUserId, p.paidAt);
 
-    const MS_MONTH = 30 * 24 * 60 * 60 * 1000;
+    const MS_DAY = 24 * 60 * 60 * 1000;
+    const MS_MONTH = 30 * MS_DAY;
 
     return lawyers.map((l) => {
       const sub = subByUser.get(l.userId);
@@ -340,9 +341,9 @@ export class AdminService {
               : (sub.canceledAt ?? null);
         }
       }
-      const monthsOverdue = overdueSince
-        ? Math.max(0, Math.floor((now.getTime() - overdueSince.getTime()) / MS_MONTH))
-        : 0;
+      const overdueMs = overdueSince ? Math.max(0, now.getTime() - overdueSince.getTime()) : 0;
+      const daysOverdue = overdueSince ? Math.floor(overdueMs / MS_DAY) : 0;
+      const monthsOverdue = overdueSince ? Math.floor(overdueMs / MS_MONTH) : 0;
 
       return {
         lawyerId: l.id,
@@ -356,6 +357,7 @@ export class AdminService {
         accountStatus: l.status,
         lastPaymentAt: lastPaidByUser.get(l.userId) ?? null,
         overdueSince,
+        daysOverdue,
         monthsOverdue,
       };
     });

@@ -17,19 +17,30 @@ interface Row {
   accountStatus: string;
   lastPaymentAt: string | null;
   overdueSince: string | null;
+  daysOverdue: number;
   monthsOverdue: number;
 }
 
-const PAYMENT: Record<Row['payment'], { label: string; variant: 'success' | 'danger' | 'neutral' }> = {
-  EM_DIA: { label: 'Em dia', variant: 'success' },
-  VENCIDO: { label: 'Vencido', variant: 'danger' },
-  SEM_PLANO: { label: 'Sem plano', variant: 'neutral' },
-};
+type Variant = 'success' | 'warning' | 'danger' | 'neutral';
+
+/** Rótulo escalonado do status de pagamento. */
+function paymentLabel(r: Row): { label: string; variant: Variant } {
+  if (r.payment === 'EM_DIA') return { label: 'Em dia', variant: 'success' };
+  if (r.payment === 'SEM_PLANO') return { label: 'Sem plano', variant: 'neutral' };
+  // Em atraso (VENCIDO): escalona por dias e por meses.
+  if (r.monthsOverdue >= 1) {
+    return {
+      label: `Em atraso há ${r.monthsOverdue} ${r.monthsOverdue === 1 ? 'mês' : 'meses'}`,
+      variant: 'danger',
+    };
+  }
+  return { label: `Em atraso (${r.daysOverdue} dia${r.daysOverdue === 1 ? '' : 's'})`, variant: 'warning' };
+}
 
 const FILTERS: Array<{ key: 'ALL' | Row['payment']; label: string }> = [
   { key: 'ALL', label: 'Todos' },
   { key: 'EM_DIA', label: 'Em dia' },
-  { key: 'VENCIDO', label: 'Vencidos' },
+  { key: 'VENCIDO', label: 'Em atraso' },
   { key: 'SEM_PLANO', label: 'Sem plano' },
 ];
 
@@ -134,7 +145,7 @@ export default function PlanilhaPage() {
                     </tr>
                   ) : (
                     filtered.map((r) => {
-                      const pay = PAYMENT[r.payment];
+                      const pay = paymentLabel(r);
                       return (
                         <tr key={r.lawyerId} className="border-b border-border last:border-0">
                           <td className="px-4 py-3">
@@ -156,11 +167,8 @@ export default function PlanilhaPage() {
                           </td>
                           <td className="px-4 py-3 text-muted-foreground">
                             {r.payment === 'VENCIDO' && r.overdueSince ? (
-                              <span className={r.monthsOverdue >= 2 ? 'text-accent' : undefined}>
-                                {r.monthsOverdue > 0 ? `${r.monthsOverdue} mês(es)` : '< 1 mês'}
-                                <span className="block text-xs">
-                                  desde {new Date(r.overdueSince).toLocaleDateString('pt-BR')}
-                                </span>
+                              <span className="text-xs">
+                                desde {new Date(r.overdueSince).toLocaleDateString('pt-BR')}
                               </span>
                             ) : (
                               '—'
