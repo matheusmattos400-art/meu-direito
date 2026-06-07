@@ -21,6 +21,8 @@ const empty = {
   birthDate: '',
   oabNumber: '',
   oabState: '',
+  city: '',
+  avatarUrl: '',
   residentialAddress: '',
   professionalAddress: '',
 };
@@ -131,6 +133,12 @@ export default function NovoAdvogadoPage() {
             </Group>
             <Group label="UF da OAB">
               <Input maxLength={2} value={form.oabState} onChange={(e) => set('oabState', e.target.value)} required />
+            </Group>
+            <Group label="Cidade de atuação">
+              <Input value={form.city} onChange={(e) => set('city', e.target.value)} placeholder="São Paulo" />
+            </Group>
+            <Group label="Foto de perfil (URL)">
+              <Input value={form.avatarUrl} onChange={(e) => set('avatarUrl', e.target.value)} placeholder="https://..." />
             </Group>
             <Group label="Endereço residencial" full>
               <Input value={form.residentialAddress} onChange={(e) => set('residentialAddress', e.target.value)} />

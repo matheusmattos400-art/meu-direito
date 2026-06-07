@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Spinner } from '@app/ui';
+import { Avatar, Badge, Button, Card, CardContent, CardHeader, CardTitle, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
 import { LAWYER_STATUS_META, type LawyerStatus } from '@/lib/lawyer-status';
 
@@ -22,6 +22,8 @@ interface Detail {
     phone: string | null;
     phone2: string | null;
     birthDate: string | null;
+    city: string | null;
+    avatarUrl: string | null;
     oab: string;
     residentialAddress: string | null;
     professionalAddress: string | null;
@@ -29,8 +31,28 @@ interface Detail {
   };
   term: { accepted: boolean; acceptedAt: string | null };
   submittedAt: string | null;
+  clients: Array<{
+    caseId: string;
+    protocol: string;
+    clientName: string | null;
+    category: string | null;
+    caseStatus: string;
+  }>;
   documents: Array<{ id: string; kind: string | null; fileName: string; downloadUrl: string }>;
 }
+
+const CASE_STATUS_LABEL: Record<string, string> = {
+  SUBMITTED: 'Enviado',
+  TRIAGING: 'Em triagem',
+  TRIAGED: 'Triado',
+  RESOLVED_INFO: 'Dúvida resolvida',
+  QUALIFIED: 'Qualificado',
+  AVAILABLE: 'Disponível',
+  ASSIGNED: 'Em atendimento',
+  IN_PROGRESS: 'Em andamento',
+  CLOSED: 'Encerrado',
+  ARCHIVED: 'Arquivado',
+};
 
 const DOC_LABEL: Record<string, string> = {
   IDENTITY: 'Documento de identidade',
@@ -91,7 +113,15 @@ export default function LawyerDetailPage() {
           ← Advogados
         </Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="font-serif text-3xl tracking-tightish">{data.profile.fullName ?? 'Advogado'}</h1>
+          <div className="flex items-center gap-4">
+            <Avatar src={data.profile.avatarUrl} name={data.profile.fullName} size="lg" />
+            <div>
+              <h1 className="font-serif text-3xl tracking-tightish">{data.profile.fullName ?? 'Advogado'}</h1>
+              <p className="text-sm text-muted-foreground">
+                {data.profile.city ? `${data.profile.city} · ` : ''}OAB {data.profile.oab}
+              </p>
+            </div>
+          </div>
           <Badge variant={meta.variant} dot>
             {meta.label}
           </Badge>
@@ -132,6 +162,7 @@ export default function LawyerDetailPage() {
           <Field label="Telefone" value={data.profile.phone} />
           <Field label="Telefone 2" value={data.profile.phone2} />
           <Field label="Nº da OAB" value={data.profile.oab} />
+          <Field label="Cidade de atuação" value={data.profile.city} />
           <Field label="Áreas de atuação" value={data.profile.specialties.join(', ') || null} />
           <Field label="Endereço residencial" value={data.profile.residentialAddress} />
           <Field label="Endereço profissional" value={data.profile.professionalAddress} />
@@ -139,6 +170,35 @@ export default function LawyerDetailPage() {
             label="Termo de responsabilidade"
             value={data.term.accepted ? `Aceito em ${fmtDate(data.term.acceptedAt, true)}` : 'Não aceito'}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle className="text-base">Clientes da plataforma</CardTitle>
+          <span className="text-sm text-muted-foreground">
+            <span className="tabular-nums text-foreground">{data.clients.length}</span> cliente(s)
+          </span>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          {data.clients.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum cliente atribuído ainda.</p>
+          ) : (
+            data.clients.map((c) => (
+              <div
+                key={c.caseId}
+                className="flex items-center justify-between gap-4 rounded-md border border-border px-3 py-2 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="truncate">{c.clientName ?? 'Cliente'}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {c.category ?? 'Caso'} · {c.protocol}
+                  </p>
+                </div>
+                <Badge>{CASE_STATUS_LABEL[c.caseStatus] ?? c.caseStatus}</Badge>
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
 

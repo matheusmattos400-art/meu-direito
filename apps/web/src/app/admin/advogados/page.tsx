@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Badge, Button, Card, CardContent, Spinner } from '@app/ui';
+import { Avatar, Badge, Button, Card, CardContent, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
 import { LAWYER_STATUS_META, type LawyerStatus } from '@/lib/lawyer-status';
 
@@ -12,6 +12,8 @@ interface LawyerRow {
   email: string | null;
   oab: string;
   state: string;
+  city: string | null;
+  avatarUrl: string | null;
   specialties: string[];
   processCount: number;
   status: LawyerStatus;
@@ -109,11 +111,14 @@ export default function AdvogadosPage() {
                     <Link key={l.lawyerId} href={`/admin/advogados/${l.lawyerId}`}>
                       <Card className="transition-colors hover:border-ring">
                         <CardContent className="flex items-center justify-between gap-4 py-4">
-                          <div className="min-w-0">
-                            <p className="truncate font-medium">{l.name ?? 'Sem nome'}</p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {l.specialties.join(' · ') || 'Sem áreas'} · OAB {l.oab}
-                            </p>
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Avatar src={l.avatarUrl} name={l.name} size="md" />
+                            <div className="min-w-0">
+                              <p className="truncate font-medium">{l.name ?? 'Sem nome'}</p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {l.city ? `${l.city}/${l.state}` : l.state} · {l.specialties.join(' · ') || 'Sem áreas'}
+                              </p>
+                            </div>
                           </div>
                           <div className="flex shrink-0 items-center gap-4">
                             <span className="text-right text-xs text-muted-foreground">

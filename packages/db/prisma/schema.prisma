@@ -196,6 +196,8 @@ model Lawyer {
   phone               String?
   phone2              String?
   birthDate           DateTime?
+  city                String? // cidade de atuação (noção de demanda)
+  avatarUrl           String? // foto de perfil (exibida ao cidadão)
   residentialAddress  String?
   professionalAddress String?
   termAccepted        Boolean      @default(false)

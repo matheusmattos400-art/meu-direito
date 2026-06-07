@@ -31,6 +31,8 @@ export class AdminService {
       email: l.user.email,
       oab: `${l.oabNumber}/${l.oabState}`,
       state: l.oabState,
+      city: l.city,
+      avatarUrl: l.avatarUrl,
       specialties: l.specialties.map((s) => s.category.name),
       processCount: l._count.monitorings,
       status: l.status,
@@ -46,6 +48,11 @@ export class AdminService {
         user: true,
         specialties: { include: { category: true } },
         verificationDocuments: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
+        assignments: {
+          where: { status: 'ACCEPTED' },
+          orderBy: { updatedAt: 'desc' },
+          include: { case: { include: { citizen: true, category: true } } },
+        },
       },
     });
     if (!l) throw new NotFoundException('Advogado não encontrado.');
@@ -66,6 +73,8 @@ export class AdminService {
         phone: l.phone,
         phone2: l.phone2,
         birthDate: l.birthDate,
+        city: l.city,
+        avatarUrl: l.avatarUrl,
         oab: `${l.oabNumber}/${l.oabState}`,
         residentialAddress: l.residentialAddress,
         professionalAddress: l.professionalAddress,
@@ -73,6 +82,13 @@ export class AdminService {
       },
       term: { accepted: l.termAccepted, acceptedAt: l.termAcceptedAt },
       submittedAt: l.submittedAt,
+      clients: l.assignments.map((a) => ({
+        caseId: a.caseId,
+        protocol: a.case.protocol,
+        clientName: a.case.citizen.fullName ?? a.case.citizen.email,
+        category: a.case.category?.name ?? null,
+        caseStatus: a.case.status,
+      })),
       documents: await Promise.all(
         l.verificationDocuments.map(async (d) => ({
           id: d.id,
@@ -135,6 +151,8 @@ export class AdminService {
             phone: dto.phone,
             phone2: dto.phone2 ?? null,
             birthDate: birthDate && !Number.isNaN(birthDate.getTime()) ? birthDate : null,
+            city: dto.city ?? null,
+            avatarUrl: dto.avatarUrl ? dto.avatarUrl : null,
             residentialAddress: dto.residentialAddress ?? null,
             professionalAddress: dto.professionalAddress ?? null,
           },

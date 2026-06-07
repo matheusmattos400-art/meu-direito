@@ -60,6 +60,8 @@ export class IdentityService {
       phone: dto.phone,
       phone2: dto.phone2 ?? null,
       birthDate: Number.isNaN(birthDate.getTime()) ? null : birthDate,
+      city: dto.city ?? null,
+      avatarUrl: dto.avatarUrl ? dto.avatarUrl : null,
       residentialAddress: dto.residentialAddress,
       professionalAddress: dto.professionalAddress,
     };
@@ -184,6 +186,8 @@ export class IdentityService {
       phone: lawyer.phone,
       phone2: lawyer.phone2,
       birthDate: lawyer.birthDate,
+      city: lawyer.city,
+      avatarUrl: lawyer.avatarUrl,
       oabNumber: lawyer.oabNumber,
       oabState: lawyer.oabState,
       residentialAddress: lawyer.residentialAddress,
