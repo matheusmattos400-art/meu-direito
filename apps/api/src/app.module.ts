@@ -16,6 +16,7 @@ import { WorkspaceModule } from './modules/workspace/workspace.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { ConsentModule } from './modules/consent/consent.module';
 import { DocumentsModule } from './modules/documents/documents.module';
+import { PecasModule } from './modules/pecas/pecas.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -33,6 +34,7 @@ import { HealthController } from './health.controller';
     AdminModule,
     ConsentModule,
     DocumentsModule,
+    PecasModule,
   ],
   controllers: [HealthController],
   providers: [

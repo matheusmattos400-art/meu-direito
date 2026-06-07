@@ -88,6 +88,30 @@ export const moveKanbanCardSchema = z.object({
 });
 export type MoveKanbanCardInput = z.infer<typeof moveKanbanCardSchema>;
 
+/** Criação de uma peça (documento gerado). */
+export const createPecaSchema = z.object({
+  caseId: z.string().uuid(),
+  type: z.enum(['DRAFT_PETITION', 'PETITION', 'TRIAGE_REPORT', 'OTHER']).default('DRAFT_PETITION'),
+  title: z.string().min(1).max(200),
+  content: z.string().max(100_000).default(''),
+});
+export type CreatePecaInput = z.infer<typeof createPecaSchema>;
+
+/** Atualização de uma peça. */
+export const updatePecaSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  content: z.string().max(100_000),
+});
+export type UpdatePecaInput = z.infer<typeof updatePecaSchema>;
+
+/** Pedido de assistência de IA no editor de peças. */
+export const pecaAiSchema = z.object({
+  caseId: z.string().uuid(),
+  instruction: z.string().min(1).max(4_000),
+  currentContent: z.string().max(100_000).optional(),
+});
+export type PecaAiInput = z.infer<typeof pecaAiSchema>;
+
 /** Validação de OAB no cadastro do advogado. */
 export const lawyerRegistrationSchema = z.object({
   fullName: z.string().min(3).max(200),

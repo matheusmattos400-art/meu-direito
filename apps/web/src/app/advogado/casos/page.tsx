@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Card, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
 
@@ -73,7 +74,9 @@ export default function CasosKanbanPage() {
               </div>
               {cards.map((card) => (
                 <Card key={card.assignmentId} className="p-4">
-                  <p className="text-sm font-medium">{card.title}</p>
+                  <Link href={`/advogado/casos/${card.caseId}`} className="hover:underline">
+                    <p className="text-sm font-medium">{card.title}</p>
+                  </Link>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {card.category ?? 'Caso'} · {card.protocol}
                   </p>
