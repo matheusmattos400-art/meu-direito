@@ -157,8 +157,8 @@ export class AdminController {
 
   @Get('stats')
   @ApiOperation({ summary: 'Métricas de BI (cadastros, casos por categoria/status/cidade, conversão).' })
-  stats() {
-    return this.admin.stats().then((data) => ({ data }));
+  stats(@CurrentUser() user: User) {
+    return this.admin.stats(user.isOwner).then((data) => ({ data }));
   }
 
   @Get('notifications')

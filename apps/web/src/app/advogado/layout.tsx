@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LogoutButton } from '@/components/logout-button';
 
 export default function AdvogadoLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -27,6 +28,7 @@ export default function AdvogadoLayout({ children }: { children: React.ReactNode
             <Link href="/suporte" className="hover:text-foreground">
               Suporte
             </Link>
+            <LogoutButton className="hover:text-foreground" />
           </nav>
         </div>
       </header>

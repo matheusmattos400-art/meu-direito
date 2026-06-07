@@ -582,7 +582,7 @@ export class AdminService {
   }
 
   // ---------------- BI / dashboards ----------------
-  async stats() {
+  async stats(isOwner = false) {
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     const [newUsers, byStatus, byCategoryRaw, byCityRaw, qualifiedOrBeyond, assignedOrBeyond] =
@@ -639,12 +639,12 @@ export class AdminService {
         count: g._count._all,
       })),
       support,
-      overview: await this.overview(support.open),
+      overview: await this.overview(support.open, isOwner),
     };
   }
 
-  /** Resumo por área para o Painel (hub). */
-  private async overview(supportOpen: number) {
+  /** Resumo por área para o Painel (hub). O saldo (MRR) só vai para o proprietário. */
+  private async overview(supportOpen: number, isOwner: boolean) {
     const [lawyersActive, lawyersPending, citizens, activeSubs, plans] = await Promise.all([
       this.prisma.lawyer.count({ where: { status: 'ACTIVE' } }),
       this.prisma.lawyer.count({ where: { status: 'IN_ANALYSIS' } }),
@@ -654,7 +654,15 @@ export class AdminService {
     ]);
     const priceByCode = new Map(plans.map((p) => [p.code, Number(p.priceBRL)]));
     const mrr = activeSubs.reduce((s, sub) => s + (priceByCode.get(sub.planCode) ?? 0), 0);
-    return { lawyersActive, lawyersPending, citizens, mrr, supportOpen };
+    return {
+      lawyersActive,
+      lawyersPending,
+      citizens,
+      supportOpen,
+      activeSubscriptions: activeSubs.length,
+      // Saldo visível apenas ao proprietário.
+      mrr: isOwner ? mrr : null,
+    };
   }
 
   /** Métricas de suporte (abertos/em andamento/resolvidos + tempo médio de 1ª resposta). */

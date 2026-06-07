@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { Spinner } from '@app/ui';
 import { useMe } from '@/lib/use-me';
 import { apiFetch } from '@/lib/api';
+import { LogoutButton } from '@/components/logout-button';
 
 const NAV: Array<{ href: string; label: string; icon: string; scope: string | null }> = [
   { href: '/admin', label: 'Painel', icon: 'M3 12l9-9 9 9M5 10v10h14V10', scope: null },
@@ -130,9 +131,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        {!collapsed && (
-          <div className="mt-auto px-3 pt-6 text-xs text-muted-foreground">{me.email}</div>
-        )}
+        <div className="mt-auto flex flex-col gap-2 pt-6">
+          {!collapsed && <div className="px-3 text-xs text-muted-foreground">{me.email}</div>}
+          <LogoutButton
+            className={`flex items-center gap-3 rounded-lg py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${
+              collapsed ? 'justify-center px-0' : 'px-3'
+            }`}
+            label={collapsed ? '⎋' : 'Sair'}
+          />
+        </div>
       </aside>
 
       <div className="flex-1">

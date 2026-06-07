@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button, Card, CardContent, CardHeader, CardTitle, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
 import { CASE_STATUS_LABEL } from '@/lib/case-status';
+import { LogoutButton } from '@/components/logout-button';
 
 interface CaseItem {
   id: string;
@@ -38,6 +39,7 @@ export default function MeusCasosPage() {
           <Link href="/triagem">
             <Button size="sm">Novo caso</Button>
           </Link>
+          <LogoutButton className="px-2 text-sm text-muted-foreground hover:text-foreground" />
         </div>
       </div>
 

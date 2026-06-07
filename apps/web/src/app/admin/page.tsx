@@ -14,8 +14,9 @@ interface Stats {
     lawyersActive: number;
     lawyersPending: number;
     citizens: number;
-    mrr: number;
     supportOpen: number;
+    activeSubscriptions: number;
+    mrr: number | null;
   };
 }
 
@@ -45,7 +46,14 @@ export default function AdminDashboard() {
   const hub = [
     { scope: 'ADVOGADOS', href: '/admin/advogados', label: 'Advogados ativos', value: String(o.lawyersActive),
       hint: o.lawyersPending > 0 ? `${o.lawyersPending} aguardando análise` : 'nenhum em análise', alert: o.lawyersPending > 0 },
-    { scope: 'FINANCEIRO', href: '/admin/financeiro', label: 'Receita recorrente', value: brl(o.mrr), hint: 'assinaturas ativas', alert: false },
+    {
+      scope: 'FINANCEIRO',
+      href: '/admin/financeiro',
+      label: me?.isOwner ? 'Receita recorrente' : 'Assinaturas ativas',
+      value: me?.isOwner && o.mrr != null ? brl(o.mrr) : String(o.activeSubscriptions),
+      hint: me?.isOwner ? 'saldo mensal' : 'assinaturas ativas',
+      alert: false,
+    },
     { scope: 'SUPORTE', href: '/admin/suporte', label: 'Chamados abertos', value: String(o.supportOpen), hint: 'no suporte', alert: o.supportOpen > 0 },
     { scope: 'CADASTROS', href: '/admin/cadastros', label: 'Cidadãos cadastrados', value: String(o.citizens), hint: 'na plataforma', alert: false },
   ].filter((c) => can(c.scope));
