@@ -31,7 +31,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setCollapsed(localStorage.getItem('adminSidebarCollapsed') === '1');
   }, []);
   useEffect(() => {
-    if (!loading && me?.role !== 'ADMIN') router.replace('/');
+    if (!loading && me?.role !== 'ADMIN') router.replace('/login');
   }, [loading, me, router]);
   useEffect(() => {
     if (me?.role !== 'ADMIN') return;

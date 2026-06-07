@@ -47,10 +47,13 @@ export default function DevLoginPage() {
             onChange={(e) => setEmail(e.target.value)}
           />
           <div className="flex flex-col gap-2">
-            <Button disabled={!email} onClick={() => enter('LAWYER', '/advogado')}>
+            <Button disabled={!email} onClick={() => enter('ADMIN', '/admin')}>
+              Entrar como Administrador
+            </Button>
+            <Button variant="outline" disabled={!email} onClick={() => enter('LAWYER', '/advogado')}>
               Entrar como Advogado
             </Button>
-            <Button variant="outline" disabled={!email} onClick={() => enter('CITIZEN', '/triagem')}>
+            <Button variant="ghost" disabled={!email} onClick={() => enter('CITIZEN', '/triagem')}>
               Entrar como Cidadão
             </Button>
           </div>

@@ -16,15 +16,18 @@ export default function LoginPage() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
 
-  // O admin é um aplicativo separado (o "cérebro"); cidadão/advogado ficam aqui.
-  async function redirectByRole() {
-    const me = await apiFetch<{ role: string }>('/me').catch(() => null);
-    if (me?.role === 'ADMIN') {
-      const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL ?? 'http://localhost:3001/admin';
-      window.location.href = adminUrl;
-      return;
+  /** Só administradores entram aqui; demais perfis são barrados. */
+  async function ensureAdminOrReject(): Promise<boolean> {
+    try {
+      const me = await apiFetch<{ role: string }>('/me');
+      if (me.role === 'ADMIN') return true;
+    } catch {
+      /* ignore */
     }
-    router.push(me?.role === 'LAWYER' ? '/advogado' : '/triagem');
+    await getSupabaseBrowser().auth.signOut();
+    setStatus('error');
+    setError('Acesso exclusivo para administradores.');
+    return false;
   }
 
   async function signInPassword(e: React.FormEvent) {
@@ -35,7 +38,7 @@ export default function LoginPage() {
       const supabase = getSupabaseBrowser();
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      await redirectByRole();
+      if (await ensureAdminOrReject()) router.push('/admin');
     } catch (err) {
       setStatus('error');
       setError(err instanceof Error ? err.message : 'E-mail ou senha inválidos.');
@@ -50,7 +53,7 @@ export default function LoginPage() {
       const supabase = getSupabaseBrowser();
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: `${window.location.origin}/triagem` },
+        options: { emailRedirectTo: `${window.location.origin}/admin` },
       });
       if (error) throw error;
       setStatus('sent');
@@ -64,8 +67,8 @@ export default function LoginPage() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
       <Card>
         <CardHeader>
-          <CardTitle>Entrar</CardTitle>
-          <CardDescription>Acesse sua conta na plataforma.</CardDescription>
+          <CardTitle>Administração</CardTitle>
+          <CardDescription>Acesso restrito à equipe administrativa.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex gap-2 rounded-lg border border-border p-1">
