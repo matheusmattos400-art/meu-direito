@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { User } from '@app/db';
 import {
@@ -43,9 +43,15 @@ export class AdminController {
   }
 
   @Get('finance/sheet')
-  @ApiOperation({ summary: 'Planilha de pagamentos por advogado (status, casos no mês).' })
+  @ApiOperation({ summary: 'Planilha de pagamentos por advogado (status, casos no mês, atraso).' })
   financeSheet() {
     return this.admin.paymentSheet().then((data) => ({ data }));
+  }
+
+  @Get('finance/evolution')
+  @ApiOperation({ summary: 'Evolução do número de advogados por mês (filtro de data).' })
+  financeEvolution(@Query('from') from?: string, @Query('to') to?: string) {
+    return this.admin.evolution(from, to).then((data) => ({ data }));
   }
 
   @Post('plans')

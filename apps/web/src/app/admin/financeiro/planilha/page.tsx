@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Avatar, Badge, Card, CardContent, Input, Spinner } from '@app/ui';
+import { Avatar, Badge, Button, Card, CardContent, Input, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
 
 interface Row {
@@ -15,6 +15,9 @@ interface Row {
   payment: 'EM_DIA' | 'VENCIDO' | 'SEM_PLANO';
   casesThisMonth: number;
   accountStatus: string;
+  lastPaymentAt: string | null;
+  overdueSince: string | null;
+  monthsOverdue: number;
 }
 
 const PAYMENT: Record<Row['payment'], { label: string; variant: 'success' | 'danger' | 'neutral' }> = {
@@ -36,6 +39,7 @@ export default function PlanilhaPage() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<'ALL' | Row['payment']>('ALL');
+  const [overdueBefore, setOverdueBefore] = useState('');
 
   useEffect(() => {
     apiFetch<Row[]>('/admin/finance/sheet')
@@ -46,12 +50,16 @@ export default function PlanilhaPage() {
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
+    const beforeTs = overdueBefore ? new Date(overdueBefore).getTime() : null;
     return rows.filter((r) => {
       const okFilter = filter === 'ALL' || r.payment === filter;
       const okTerm = !term || (r.name ?? '').toLowerCase().includes(term) || (r.email ?? '').toLowerCase().includes(term);
-      return okFilter && okTerm;
+      // Filtro de data: vencidos cujo atraso começou antes da data escolhida.
+      const okDate =
+        !beforeTs || (r.overdueSince != null && new Date(r.overdueSince).getTime() <= beforeTs);
+      return okFilter && okTerm && okDate;
     });
-  }, [rows, q, filter]);
+  }, [rows, q, filter, overdueBefore]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -82,6 +90,20 @@ export default function PlanilhaPage() {
             </button>
           ))}
         </div>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground sm:ml-auto">
+          Vencidos antes de
+          <Input
+            type="date"
+            value={overdueBefore}
+            onChange={(e) => setOverdueBefore(e.target.value)}
+            className="h-9 w-auto"
+          />
+          {overdueBefore && (
+            <Button size="sm" variant="ghost" onClick={() => setOverdueBefore('')}>
+              limpar
+            </Button>
+          )}
+        </label>
       </div>
 
       {loading ? (
@@ -100,12 +122,13 @@ export default function PlanilhaPage() {
                     <th className="px-4 py-3 font-medium">Plano</th>
                     <th className="px-4 py-3 text-center font-medium">Casos no mês</th>
                     <th className="px-4 py-3 font-medium">Pagamento</th>
+                    <th className="px-4 py-3 font-medium">Atraso</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                      <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
                         Nenhum resultado.
                       </td>
                     </tr>
@@ -130,6 +153,18 @@ export default function PlanilhaPage() {
                             <Badge variant={pay.variant} dot>
                               {pay.label}
                             </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {r.payment === 'VENCIDO' && r.overdueSince ? (
+                              <span className={r.monthsOverdue >= 2 ? 'text-accent' : undefined}>
+                                {r.monthsOverdue > 0 ? `${r.monthsOverdue} mês(es)` : '< 1 mês'}
+                                <span className="block text-xs">
+                                  desde {new Date(r.overdueSince).toLocaleDateString('pt-BR')}
+                                </span>
+                              </span>
+                            ) : (
+                              '—'
+                            )}
                           </td>
                         </tr>
                       );

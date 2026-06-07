@@ -72,6 +72,8 @@ export default function FinanceiroPage() {
         <Metric label="Advogados cancelados" value={String(data.lawyersCanceled)} />
       </div>
 
+      <EvolutionCard />
+
       {/* Gráfico de barras por estado */}
       <Card>
         <CardContent className="pt-6">
@@ -201,6 +203,86 @@ function NewPlanForm({ onCreated }: { onCreated: () => void }) {
         {error && <p className="text-sm text-accent">{error}</p>}
       </div>
     </form>
+  );
+}
+
+function ym(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+interface Evolution {
+  months: Array<{ month: string; new: number; cumulative: number }>;
+}
+
+function EvolutionCard() {
+  const now = new Date();
+  const [from, setFrom] = useState(ym(new Date(now.getFullYear(), now.getMonth() - 5, 1)));
+  const [to, setTo] = useState(ym(now));
+  const [ev, setEv] = useState<Evolution | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    apiFetch<Evolution>(`/admin/finance/evolution?from=${from}-01&to=${to}-01`)
+      .then(setEv)
+      .catch(() => setEv({ months: [] }))
+      .finally(() => setLoading(false));
+  }, [from, to]);
+
+  const maxNew = Math.max(1, ...(ev?.months ?? []).map((m) => m.new));
+  const totalCumulative = ev?.months.at(-1)?.cumulative ?? 0;
+
+  function fmtMonth(m: string) {
+    const parts = m.split('-');
+    const y = parts[0] ?? '';
+    const mo = Number(parts[1] ?? '1');
+    const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    return `${meses[mo - 1] ?? ''}/${y.slice(2)}`;
+  }
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h3 className="font-serif text-lg tracking-tightish">Evolução de advogados</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Novos por mês · total acumulado: <span className="text-foreground">{totalCumulative}</span>
+            </p>
+          </div>
+          <div className="flex items-end gap-2">
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+              De
+              <Input type="month" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+              Até
+              <Input type="month" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" />
+            </label>
+          </div>
+        </div>
+
+        {loading ? (
+          <Spinner className="text-muted-foreground" />
+        ) : !ev || ev.months.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sem dados no período.</p>
+        ) : (
+          <div className="flex items-end gap-3 overflow-x-auto pb-2" style={{ height: 200 }}>
+            {ev.months.map((m) => (
+              <div key={m.month} className="flex w-16 shrink-0 flex-col items-center gap-2">
+                <span className="text-xs tabular-nums text-muted-foreground">+{m.new}</span>
+                <div
+                  className="w-10 rounded-t-md bg-accent transition-all"
+                  style={{ height: `${(m.new / maxNew) * 130}px`, minHeight: m.new > 0 ? 6 : 2 }}
+                  title={`Acumulado: ${m.cumulative}`}
+                />
+                <span className="text-[11px] text-muted-foreground">{fmtMonth(m.month)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

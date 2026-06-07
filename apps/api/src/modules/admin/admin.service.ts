@@ -265,12 +265,45 @@ export class AdminService {
     };
   }
 
-  /** Planilha de pagamentos: por advogado, status do pagamento e casos no mês. */
+  /** Evolução do número de advogados por mês (novos + acumulado), com filtro de data. */
+  async evolution(fromStr?: string, toStr?: string) {
+    const now = new Date();
+    // Parse local (evita o deslocamento de fuso ao interpretar 'YYYY-MM-DD' como UTC).
+    const parseLocal = (s?: string): Date | null => {
+      if (!s) return null;
+      const [y, m] = s.split('-').map(Number);
+      if (!y || !m) return null;
+      return new Date(y, m - 1, 1);
+    };
+    const to = parseLocal(toStr) ?? now;
+    const from = parseLocal(fromStr) ?? new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+    const lawyers = await this.prisma.lawyer.findMany({ select: { createdAt: true } });
+
+    const months: Array<{ month: string; new: number; cumulative: number }> = [];
+    let cursor = new Date(from.getFullYear(), from.getMonth(), 1);
+    const end = new Date(to.getFullYear(), to.getMonth(), 1);
+    let guard = 0;
+    while (cursor <= end && guard < 60) {
+      const mStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+      const mEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+      months.push({
+        month: `${mStart.getFullYear()}-${String(mStart.getMonth() + 1).padStart(2, '0')}`,
+        new: lawyers.filter((l) => l.createdAt >= mStart && l.createdAt < mEnd).length,
+        cumulative: lawyers.filter((l) => l.createdAt < mEnd).length,
+      });
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+      guard += 1;
+    }
+    return { from: from.toISOString(), to: to.toISOString(), months };
+  }
+
+  /** Planilha de pagamentos: por advogado, status, casos no mês e tempo de atraso. */
   async paymentSheet() {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [lawyers, subs, assignments] = await Promise.all([
+    const [lawyers, subs, assignments, paidPayments] = await Promise.all([
       this.prisma.lawyer.findMany({ include: { user: true }, orderBy: { createdAt: 'desc' } }),
       this.prisma.subscription.findMany({ orderBy: { createdAt: 'desc' } }),
       this.prisma.caseAssignment.groupBy({
@@ -278,19 +311,39 @@ export class AdminService {
         where: { status: 'ACCEPTED', respondedAt: { gte: monthStart } },
         _count: { _all: true },
       }),
+      this.prisma.payment.findMany({
+        where: { status: 'PAID' },
+        orderBy: { paidAt: 'desc' },
+        select: { payerUserId: true, paidAt: true },
+      }),
     ]);
 
     const subByUser = new Map<string, (typeof subs)[number]>();
     for (const s of subs) if (!subByUser.has(s.lawyerUserId)) subByUser.set(s.lawyerUserId, s);
     const casesByLawyer = new Map(assignments.map((a) => [a.lawyerId, a._count._all]));
+    const lastPaidByUser = new Map<string, Date>();
+    for (const p of paidPayments) if (p.paidAt && !lastPaidByUser.has(p.payerUserId)) lastPaidByUser.set(p.payerUserId, p.paidAt);
+
+    const MS_MONTH = 30 * 24 * 60 * 60 * 1000;
 
     return lawyers.map((l) => {
       const sub = subByUser.get(l.userId);
       let payment: 'EM_DIA' | 'VENCIDO' | 'SEM_PLANO' = 'SEM_PLANO';
+      let overdueSince: Date | null = null;
       if (sub) {
         const inPeriod = sub.currentPeriodEnd ? sub.currentPeriodEnd > now : false;
         payment = sub.status === 'ACTIVE' && inPeriod ? 'EM_DIA' : 'VENCIDO';
+        if (payment === 'VENCIDO') {
+          overdueSince =
+            sub.currentPeriodEnd && sub.currentPeriodEnd <= now
+              ? sub.currentPeriodEnd
+              : (sub.canceledAt ?? null);
+        }
       }
+      const monthsOverdue = overdueSince
+        ? Math.max(0, Math.floor((now.getTime() - overdueSince.getTime()) / MS_MONTH))
+        : 0;
+
       return {
         lawyerId: l.id,
         name: l.user.fullName,
@@ -301,6 +354,9 @@ export class AdminService {
         payment,
         casesThisMonth: casesByLawyer.get(l.id) ?? 0,
         accountStatus: l.status,
+        lastPaymentAt: lastPaidByUser.get(l.userId) ?? null,
+        overdueSince,
+        monthsOverdue,
       };
     });
   }
