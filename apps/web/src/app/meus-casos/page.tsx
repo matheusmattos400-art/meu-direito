@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button, Card, CardContent, CardHeader, CardTitle, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
+import { CASE_STATUS_LABEL } from '@/lib/case-status';
 
 interface CaseItem {
   id: string;
@@ -13,19 +14,6 @@ interface CaseItem {
   title: string | null;
   createdAt: string;
 }
-
-const STATUS_LABEL: Record<string, string> = {
-  SUBMITTED: 'Enviado',
-  TRIAGING: 'Em triagem',
-  TRIAGED: 'Triado',
-  RESOLVED_INFO: 'Dúvida resolvida',
-  QUALIFIED: 'Qualificado',
-  AVAILABLE: 'Disponível',
-  ASSIGNED: 'Em atendimento',
-  IN_PROGRESS: 'Em andamento',
-  CLOSED: 'Encerrado',
-  ARCHIVED: 'Arquivado',
-};
 
 export default function MeusCasosPage() {
   const [cases, setCases] = useState<CaseItem[]>([]);
@@ -71,7 +59,7 @@ export default function MeusCasosPage() {
               <CardContent className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>Protocolo {c.protocol}</span>
                 <span className="rounded-full border border-border px-3 py-1 text-xs">
-                  {STATUS_LABEL[c.status] ?? c.status}
+                  {CASE_STATUS_LABEL[c.status] ?? c.status}
                 </span>
               </CardContent>
             </Card>

@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { Avatar, Badge, Button, Card, CardContent, CardHeader, CardTitle, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
 import { LAWYER_STATUS_META, type LawyerStatus } from '@/lib/lawyer-status';
+import { caseStatusLabel } from '@/lib/case-status';
 
 interface Detail {
   lawyerId: string;
@@ -40,19 +41,6 @@ interface Detail {
   }>;
   documents: Array<{ id: string; kind: string | null; fileName: string; downloadUrl: string }>;
 }
-
-const CASE_STATUS_LABEL: Record<string, string> = {
-  SUBMITTED: 'Enviado',
-  TRIAGING: 'Em triagem',
-  TRIAGED: 'Triado',
-  RESOLVED_INFO: 'Dúvida resolvida',
-  QUALIFIED: 'Qualificado',
-  AVAILABLE: 'Disponível',
-  ASSIGNED: 'Em atendimento',
-  IN_PROGRESS: 'Em andamento',
-  CLOSED: 'Encerrado',
-  ARCHIVED: 'Arquivado',
-};
 
 const DOC_LABEL: Record<string, string> = {
   IDENTITY: 'Documento de identidade',
@@ -195,7 +183,7 @@ export default function LawyerDetailPage() {
                     {c.category ?? 'Caso'} · {c.protocol}
                   </p>
                 </div>
-                <Badge>{CASE_STATUS_LABEL[c.caseStatus] ?? c.caseStatus}</Badge>
+                <Badge>{caseStatusLabel(c.caseStatus)}</Badge>
               </div>
             ))
           )}

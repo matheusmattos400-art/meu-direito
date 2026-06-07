@@ -639,7 +639,22 @@ export class AdminService {
         count: g._count._all,
       })),
       support,
+      overview: await this.overview(support.open),
     };
+  }
+
+  /** Resumo por área para o Painel (hub). */
+  private async overview(supportOpen: number) {
+    const [lawyersActive, lawyersPending, citizens, activeSubs, plans] = await Promise.all([
+      this.prisma.lawyer.count({ where: { status: 'ACTIVE' } }),
+      this.prisma.lawyer.count({ where: { status: 'IN_ANALYSIS' } }),
+      this.prisma.user.count({ where: { role: 'CITIZEN' } }),
+      this.prisma.subscription.findMany({ where: { status: 'ACTIVE' } }),
+      this.prisma.plan.findMany({ where: { active: true } }),
+    ]);
+    const priceByCode = new Map(plans.map((p) => [p.code, Number(p.priceBRL)]));
+    const mrr = activeSubs.reduce((s, sub) => s + (priceByCode.get(sub.planCode) ?? 0), 0);
+    return { lawyersActive, lawyersPending, citizens, mrr, supportOpen };
   }
 
   /** Métricas de suporte (abertos/em andamento/resolvidos + tempo médio de 1ª resposta). */

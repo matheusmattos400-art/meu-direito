@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
+import { caseStatusLabel } from '@/lib/case-status';
 
 interface Person {
   id: string;
@@ -22,19 +23,6 @@ interface Person {
     lawyerOab: string;
   } | null;
 }
-
-const CASE_STATUS_LABEL: Record<string, string> = {
-  SUBMITTED: 'Enviado',
-  TRIAGING: 'Em triagem',
-  TRIAGED: 'Triado',
-  RESOLVED_INFO: 'Dúvida resolvida',
-  QUALIFIED: 'Qualificado',
-  AVAILABLE: 'Disponível',
-  ASSIGNED: 'Em atendimento',
-  IN_PROGRESS: 'Em andamento',
-  CLOSED: 'Encerrado',
-  ARCHIVED: 'Arquivado',
-};
 
 export default function PersonDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -93,7 +81,7 @@ export default function PersonDetailPage() {
                 </p>
               </div>
               <Badge variant="accent" dot>
-                {CASE_STATUS_LABEL[p.process.caseStatus] ?? p.process.caseStatus}
+                {caseStatusLabel(p.process.caseStatus)}
               </Badge>
             </div>
           ) : (
