@@ -23,14 +23,20 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     const { data } = await supabase.auth.getSession();
     token = data.session?.access_token;
   } catch {
-    // Supabase não configurado — segue sem token (rotas públicas).
+    // Supabase não configurado — segue sem token (rotas públicas / dev bypass).
   }
+
+  // Atalho de desenvolvimento (somente quando não há sessão Supabase).
+  const devEmail = !token && typeof window !== 'undefined' ? localStorage.getItem('devEmail') : null;
+  const devRole = devEmail ? localStorage.getItem('devRole') : null;
 
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(devEmail ? { 'x-dev-email': devEmail } : {}),
+      ...(devRole ? { 'x-dev-role': devRole } : {}),
       ...init?.headers,
     },
   });

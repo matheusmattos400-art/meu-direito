@@ -35,6 +35,12 @@ export class SupabaseAuthGuard implements CanActivate {
     if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+
+    // Atalho de desenvolvimento: dispensa o JWT do Supabase. Só funciona com
+    // DEV_AUTH_BYPASS=true e fora de produção. Provisiona o usuário pelo e-mail
+    // informado no header x-dev-email (perfil via x-dev-role; ADMIN se na allowlist).
+    if (await this.tryDevBypass(request)) return true;
+
     const header = request.headers.authorization;
     if (!header || !header.startsWith('Bearer ')) {
       throw new UnauthorizedException('Token de autenticação ausente.');
@@ -76,6 +82,37 @@ export class SupabaseAuthGuard implements CanActivate {
     }
 
     request.authUser = { id: authUserId, email };
+    request.user = user;
+    return true;
+  }
+
+  /** Atalho de autenticação para desenvolvimento (gated). */
+  private async tryDevBypass(request: AuthenticatedRequest): Promise<boolean> {
+    const enabled =
+      this.config.get<string>('DEV_AUTH_BYPASS') === 'true' &&
+      this.config.get<string>('NODE_ENV') !== 'production';
+    if (!enabled) return false;
+
+    const raw = request.headers['x-dev-email'];
+    const devEmail = (Array.isArray(raw) ? raw[0] : raw)?.toLowerCase();
+    if (!devEmail) return false;
+
+    const isAdmin = this.adminEmails().includes(devEmail);
+    const roleHeader = request.headers['x-dev-role'];
+    const requested = (Array.isArray(roleHeader) ? roleHeader[0] : roleHeader)?.toUpperCase();
+    const allowed = ['CITIZEN', 'LAWYER', 'ADMIN'];
+    const role = (isAdmin ? 'ADMIN' : allowed.includes(requested ?? '') ? requested : 'CITIZEN') as
+      | 'CITIZEN'
+      | 'LAWYER'
+      | 'ADMIN';
+
+    const user = await this.prisma.user.upsert({
+      where: { email: devEmail },
+      update: { role },
+      create: { email: devEmail, role },
+    });
+
+    request.authUser = { id: user.authUserId ?? user.id, email: devEmail };
     request.user = user;
     return true;
   }

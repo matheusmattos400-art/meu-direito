@@ -13,6 +13,8 @@ export const envSchema = z.object({
   SUPABASE_JWT_SECRET: z.string().min(1).optional(),
   // E-mails (separados por vírgula) promovidos a ADMIN no provisionamento.
   ADMIN_EMAILS: z.string().optional().default(''),
+  // Atalho de autenticação SOMENTE para desenvolvimento (ignorado em produção).
+  DEV_AUTH_BYPASS: z.string().optional().default('false'),
   RATE_LIMIT_TTL: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
 });
