@@ -3,8 +3,10 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { User } from '@app/db';
 import {
   adminCreateLawyerSchema,
+  createPlanSchema,
   rejectLawyerSchema,
   type AdminCreateLawyerInput,
+  type CreatePlanInput,
   type RejectLawyerInput,
 } from '@app/validation';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -35,9 +37,24 @@ export class AdminController {
   }
 
   @Get('finance')
-  @ApiOperation({ summary: 'Visão financeira (assinaturas, MRR, pagamentos).' })
+  @ApiOperation({ summary: 'Visão financeira (assinaturas, MRR, pagamentos, advogados por estado).' })
   finance() {
     return this.admin.finance().then((data) => ({ data }));
+  }
+
+  @Get('finance/sheet')
+  @ApiOperation({ summary: 'Planilha de pagamentos por advogado (status, casos no mês).' })
+  financeSheet() {
+    return this.admin.paymentSheet().then((data) => ({ data }));
+  }
+
+  @Post('plans')
+  @ApiOperation({ summary: 'Cria um novo plano de assinatura.' })
+  createPlan(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(createPlanSchema)) dto: CreatePlanInput,
+  ) {
+    return this.admin.createPlan(user, dto).then((data) => ({ data }));
   }
 
   @Get('lawyers/:lawyerId')

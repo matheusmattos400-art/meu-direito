@@ -126,7 +126,22 @@ const CONSENT_TERMS: Array<{
   },
 ];
 
+const PLANS = [
+  { code: 'STARTER', name: 'Starter', priceBRL: 49.9, casesPerMonth: 10, areas: 1, highlights: ['1 área de atuação', 'Até 10 casos triados/mês', 'Workspace e Kanban'] },
+  { code: 'PRO', name: 'Pro', priceBRL: 149.9, casesPerMonth: 50, areas: 3, highlights: ['3 áreas de atuação', 'Até 50 casos triados/mês', 'Editor de peças com IA'] },
+  { code: 'BUSINESS', name: 'Business', priceBRL: 349.9, casesPerMonth: 1000, areas: 10, highlights: ['Até 10 áreas', 'Volume alto de casos', 'Prioridade no suporte'] },
+];
+
 async function main() {
+  console.log('🌱 Seed: planos...');
+  for (const p of PLANS) {
+    await prisma.plan.upsert({
+      where: { code: p.code },
+      update: { name: p.name, priceBRL: p.priceBRL, casesPerMonth: p.casesPerMonth, areas: p.areas, highlights: p.highlights },
+      create: p,
+    });
+  }
+
   console.log('🌱 Seed: categorias jurídicas...');
   for (const cat of CATEGORIES) {
     const category = await prisma.category.upsert({

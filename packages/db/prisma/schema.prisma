@@ -520,6 +520,21 @@ model Payment {
   @@map("payments")
 }
 
+model Plan {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  name          String
+  priceBRL      Decimal  @db.Decimal(12, 2)
+  casesPerMonth Int      @default(0)
+  areas         Int      @default(1)
+  highlights    String[]
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("plans")
+}
+
 // ----------------------- CONSENTIMENTO (LGPD) -----------------------
 model ConsentTerm {
   id          String          @id @default(uuid())

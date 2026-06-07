@@ -1,10 +1,9 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { User } from '@app/db';
-import type { AdminCreateLawyerInput, RejectLawyerInput } from '@app/validation';
+import type { AdminCreateLawyerInput, CreatePlanInput, RejectLawyerInput } from '@app/validation';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { StorageService } from '../../common/storage/storage.service';
-import { findPlan, PLANS } from '../billing/plans';
 
 @Injectable()
 export class AdminService {
@@ -187,34 +186,73 @@ export class AdminService {
   }
 
   // ---------------- Financeiro ----------------
+  async createPlan(admin: User, dto: CreatePlanInput) {
+    const exists = await this.prisma.plan.findUnique({ where: { code: dto.code } });
+    if (exists) throw new ConflictException('Já existe um plano com este código.');
+
+    const plan = await this.prisma.plan.create({
+      data: {
+        code: dto.code.toUpperCase(),
+        name: dto.name,
+        priceBRL: dto.priceBRL,
+        casesPerMonth: dto.casesPerMonth,
+        areas: dto.areas,
+        highlights: dto.highlights,
+      },
+    });
+    await this.audit.log({
+      actorId: admin.id,
+      actorRole: 'ADMIN',
+      action: 'PLAN_CREATE',
+      entityType: 'Plan',
+      entityId: plan.id,
+      metadata: { code: plan.code },
+    });
+    return { id: plan.id, code: plan.code };
+  }
+
   async finance() {
-    const [activeSubs, payments] = await Promise.all([
-      this.prisma.subscription.findMany({ where: { status: 'ACTIVE' } }),
-      this.prisma.payment.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 25,
-        include: { payerUser: { select: { email: true, fullName: true } } },
-      }),
-    ]);
+    const [plans, activeSubs, payments, lawyersActive, lawyersCanceled, byStateRaw] =
+      await Promise.all([
+        this.prisma.plan.findMany({ where: { active: true } }),
+        this.prisma.subscription.findMany({ where: { status: 'ACTIVE' } }),
+        this.prisma.payment.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 25,
+          include: { payerUser: { select: { email: true, fullName: true } } },
+        }),
+        this.prisma.lawyer.count({ where: { status: 'ACTIVE' } }),
+        this.prisma.lawyer.count({ where: { status: 'CANCELED' } }),
+        this.prisma.lawyer.groupBy({ by: ['oabState'], _count: { _all: true } }),
+      ]);
 
-    const planPrice = (code: string) => findPlan(code)?.priceBRL ?? 0;
-    const mrr = activeSubs.reduce((sum, s) => sum + planPrice(s.planCode), 0);
+    const priceByCode = new Map(plans.map((p) => [p.code, Number(p.priceBRL)]));
+    const mrr = activeSubs.reduce((sum, s) => sum + (priceByCode.get(s.planCode) ?? 0), 0);
 
-    const byPlan = PLANS.map((p) => ({
-      plan: p.name,
-      price: p.priceBRL,
-      subscribers: activeSubs.filter((s) => s.planCode === p.code).length,
-    }));
+    const byPlan = plans
+      .sort((a, b) => Number(a.priceBRL) - Number(b.priceBRL))
+      .map((p) => ({
+        plan: p.name,
+        price: Number(p.priceBRL),
+        subscribers: activeSubs.filter((s) => s.planCode === p.code).length,
+      }));
 
     const totalPaid = payments
       .filter((p) => p.status === 'PAID')
       .reduce((sum, p) => sum + Number(p.amount), 0);
 
+    const lawyersByState = byStateRaw
+      .map((g) => ({ state: g.oabState, count: g._count._all }))
+      .sort((a, b) => b.count - a.count);
+
     return {
       activeSubscriptions: activeSubs.length,
+      lawyersActive,
+      lawyersCanceled,
       mrr,
       totalPaid,
       byPlan,
+      lawyersByState,
       payments: payments.map((p) => ({
         id: p.id,
         payer: p.payerUser.fullName ?? p.payerUser.email,
@@ -225,6 +263,46 @@ export class AdminService {
         createdAt: p.createdAt,
       })),
     };
+  }
+
+  /** Planilha de pagamentos: por advogado, status do pagamento e casos no mês. */
+  async paymentSheet() {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [lawyers, subs, assignments] = await Promise.all([
+      this.prisma.lawyer.findMany({ include: { user: true }, orderBy: { createdAt: 'desc' } }),
+      this.prisma.subscription.findMany({ orderBy: { createdAt: 'desc' } }),
+      this.prisma.caseAssignment.groupBy({
+        by: ['lawyerId'],
+        where: { status: 'ACCEPTED', respondedAt: { gte: monthStart } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const subByUser = new Map<string, (typeof subs)[number]>();
+    for (const s of subs) if (!subByUser.has(s.lawyerUserId)) subByUser.set(s.lawyerUserId, s);
+    const casesByLawyer = new Map(assignments.map((a) => [a.lawyerId, a._count._all]));
+
+    return lawyers.map((l) => {
+      const sub = subByUser.get(l.userId);
+      let payment: 'EM_DIA' | 'VENCIDO' | 'SEM_PLANO' = 'SEM_PLANO';
+      if (sub) {
+        const inPeriod = sub.currentPeriodEnd ? sub.currentPeriodEnd > now : false;
+        payment = sub.status === 'ACTIVE' && inPeriod ? 'EM_DIA' : 'VENCIDO';
+      }
+      return {
+        lawyerId: l.id,
+        name: l.user.fullName,
+        email: l.user.email,
+        phone: l.phone,
+        avatarUrl: l.avatarUrl,
+        planCode: sub?.planCode ?? null,
+        payment,
+        casesThisMonth: casesByLawyer.get(l.id) ?? 0,
+        accountStatus: l.status,
+      };
+    });
   }
 
   private async setLawyerStatus(

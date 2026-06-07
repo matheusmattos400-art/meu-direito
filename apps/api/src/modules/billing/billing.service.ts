@@ -1,9 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Prisma, type User } from '@app/db';
+import type { User } from '@app/db';
 import type { SubscribeInput } from '@app/validation';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
-import { findPlan, PLANS } from './plans';
 
 const PERIOD_DAYS = 30;
 
@@ -14,8 +13,19 @@ export class BillingService {
     private readonly audit: AuditService,
   ) {}
 
-  listPlans() {
-    return PLANS;
+  async listPlans() {
+    const plans = await this.prisma.plan.findMany({
+      where: { active: true },
+      orderBy: { priceBRL: 'asc' },
+    });
+    return plans.map((p) => ({
+      code: p.code,
+      name: p.name,
+      priceBRL: Number(p.priceBRL),
+      casesPerMonth: p.casesPerMonth,
+      areas: p.areas,
+      highlights: p.highlights,
+    }));
   }
 
   async currentSubscription(user: User) {
@@ -24,12 +34,15 @@ export class BillingService {
       orderBy: { createdAt: 'desc' },
     });
     if (!sub) return null;
+    const plan = await this.prisma.plan.findUnique({ where: { code: sub.planCode } });
     return {
       id: sub.id,
       planCode: sub.planCode,
       status: sub.status,
       currentPeriodEnd: sub.currentPeriodEnd,
-      plan: findPlan(sub.planCode) ?? null,
+      plan: plan
+        ? { code: plan.code, name: plan.name, priceBRL: Number(plan.priceBRL) }
+        : null,
     };
   }
 
@@ -39,8 +52,8 @@ export class BillingService {
    * substitui este trecho mantendo o mesmo contrato.
    */
   async subscribe(user: User, dto: SubscribeInput) {
-    const plan = findPlan(dto.planCode);
-    if (!plan) throw new BadRequestException('Plano inválido.');
+    const plan = await this.prisma.plan.findUnique({ where: { code: dto.planCode } });
+    if (!plan || !plan.active) throw new BadRequestException('Plano inválido.');
 
     const now = new Date();
     const periodEnd = new Date(now.getTime() + PERIOD_DAYS * 24 * 60 * 60 * 1000);
@@ -77,7 +90,7 @@ export class BillingService {
       data: {
         subscriptionId: subscription.id,
         payerUserId: user.id,
-        amount: new Prisma.Decimal(plan.priceBRL),
+        amount: plan.priceBRL,
         currency: 'BRL',
         method: dto.method,
         status: 'PAID',

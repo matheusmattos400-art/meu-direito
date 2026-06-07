@@ -88,6 +88,21 @@ export const moveKanbanCardSchema = z.object({
 });
 export type MoveKanbanCardInput = z.infer<typeof moveKanbanCardSchema>;
 
+/** Criação de um plano SaaS (backoffice). */
+export const createPlanSchema = z.object({
+  code: z
+    .string()
+    .min(2)
+    .max(40)
+    .regex(/^[A-Z0-9_]+$/, 'Código em maiúsculas, números e _ (ex.: PREMIUM).'),
+  name: z.string().min(2).max(60),
+  priceBRL: z.coerce.number().nonnegative('Preço inválido.'),
+  casesPerMonth: z.coerce.number().int().nonnegative().default(0),
+  areas: z.coerce.number().int().nonnegative().default(1),
+  highlights: z.array(z.string().max(80)).max(8).default([]),
+});
+export type CreatePlanInput = z.infer<typeof createPlanSchema>;
+
 /** Assinatura de um plano SaaS (advogado). */
 export const subscribeSchema = z.object({
   planCode: z.string().min(1).max(40),
