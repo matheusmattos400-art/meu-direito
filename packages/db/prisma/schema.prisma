@@ -239,10 +239,15 @@ model Category {
   name        String
   description String?
   active      Boolean @default(true)
+  // Preço mensal da área (definido pelo admin) e se é ofertada como assinatura.
+  monthlyPriceBRL Decimal? @db.Decimal(12, 2)
+  billable        Boolean  @default(false)
 
-  subcategories Subcategory[]
-  cases         Case[]
-  specialties   LawyerSpecialty[]
+  subcategories     Subcategory[]
+  cases             Case[]
+  specialties       LawyerSpecialty[]
+  planAreas         PlanArea[]
+  subscriptionAreas SubscriptionArea[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -489,21 +494,39 @@ model Subscription {
   id                    String             @id @default(uuid())
   lawyerUserId          String
   lawyerUser            User               @relation(fields: [lawyerUserId], references: [id])
-  planCode              String // STARTER, PRO… (por área/volumetria)
+  // Combo curado (Plan.code) OU null quando é um combo montado pelo advogado (à la carte).
+  planCode              String?
   status                SubscriptionStatus @default(TRIALING)
+  // Total mensal vigente (preço do combo ou soma das áreas escolhidas).
+  monthlyTotalBRL       Decimal?           @db.Decimal(12, 2)
   gateway               String? // stripe | asaas | …
   gatewaySubscriptionId String?
   currentPeriodStart    DateTime?
-  currentPeriodEnd      DateTime?
+  currentPeriodEnd      DateTime? // data de renovação
   canceledAt            DateTime?
 
   payments Payment[]
+  areas    SubscriptionArea[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([lawyerUserId, status])
   @@map("subscriptions")
+}
+
+// Áreas que compõem a assinatura do advogado (com snapshot do preço no momento).
+model SubscriptionArea {
+  id             String       @id @default(uuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  categoryId     String
+  category       Category     @relation(fields: [categoryId], references: [id])
+  priceBRL       Decimal      @db.Decimal(12, 2)
+  createdAt      DateTime     @default(now())
+
+  @@unique([subscriptionId, categoryId])
+  @@map("subscription_areas")
 }
 
 model Payment {
@@ -529,19 +552,34 @@ model Payment {
   @@map("payments")
 }
 
+// Plano combo curado pelo admin: nome + áreas incluídas + preço fixo (com desconto).
 model Plan {
   id            String   @id @default(uuid())
   code          String   @unique
   name          String
   priceBRL      Decimal  @db.Decimal(12, 2)
   casesPerMonth Int      @default(0)
-  areas         Int      @default(1)
+  areas         Int      @default(1) // legado: nº de áreas (mantido p/ compat.)
   highlights    String[]
   active        Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  planAreas PlanArea[]
+
   @@map("plans")
+}
+
+// Áreas incluídas em um plano combo.
+model PlanArea {
+  id         String   @id @default(uuid())
+  planId     String
+  plan       Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  @@unique([planId, categoryId])
+  @@map("plan_areas")
 }
 
 // ----------------------- CONSENTIMENTO (LGPD) -----------------------

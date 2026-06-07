@@ -3,11 +3,13 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { User } from '@app/db';
 import {
   adminCreateLawyerSchema,
+  areaPriceSchema,
   createAdminSchema,
   createPlanSchema,
   rejectLawyerSchema,
   setAdminScopesSchema,
   type AdminCreateLawyerInput,
+  type AreaPriceInput,
   type CreateAdminInput,
   type CreatePlanInput,
   type RejectLawyerInput,
@@ -64,14 +66,39 @@ export class AdminController {
     return this.admin.evolution(from, to).then((data) => ({ data }));
   }
 
+  @Get('plans')
+  @RequireScope('FINANCEIRO')
+  @ApiOperation({ summary: 'Lista os planos combo com as áreas incluídas.' })
+  plans() {
+    return this.admin.listPlans().then((data) => ({ data }));
+  }
+
   @Post('plans')
   @RequireScope('FINANCEIRO')
-  @ApiOperation({ summary: 'Cria um novo plano de assinatura.' })
+  @ApiOperation({ summary: 'Cria um novo plano combo (nome, áreas e valor).' })
   createPlan(
     @CurrentUser() user: User,
     @Body(new ZodValidationPipe(createPlanSchema)) dto: CreatePlanInput,
   ) {
     return this.admin.createPlan(user, dto).then((data) => ({ data }));
+  }
+
+  @Get('areas')
+  @RequireScope('FINANCEIRO')
+  @ApiOperation({ summary: 'Lista as áreas do Direito com o preço mensal.' })
+  areas() {
+    return this.admin.listAreas().then((data) => ({ data }));
+  }
+
+  @Post('areas/:id/price')
+  @RequireScope('FINANCEIRO')
+  @ApiOperation({ summary: 'Define o preço mensal de uma área.' })
+  setAreaPrice(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(areaPriceSchema)) dto: AreaPriceInput,
+  ) {
+    return this.admin.setAreaPrice(user, id, dto.priceBRL, dto.billable).then((data) => ({ data }));
   }
 
   @Get('lawyers/:lawyerId')

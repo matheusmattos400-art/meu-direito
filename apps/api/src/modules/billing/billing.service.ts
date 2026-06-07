@@ -34,12 +34,15 @@ export class BillingService {
       orderBy: { createdAt: 'desc' },
     });
     if (!sub) return null;
-    const plan = await this.prisma.plan.findUnique({ where: { code: sub.planCode } });
+    const plan = sub.planCode
+      ? await this.prisma.plan.findUnique({ where: { code: sub.planCode } })
+      : null;
     return {
       id: sub.id,
       planCode: sub.planCode,
       status: sub.status,
       currentPeriodEnd: sub.currentPeriodEnd,
+      monthlyTotalBRL: sub.monthlyTotalBRL != null ? Number(sub.monthlyTotalBRL) : null,
       plan: plan
         ? { code: plan.code, name: plan.name, priceBRL: Number(plan.priceBRL) }
         : null,

@@ -162,10 +162,18 @@ export const createPlanSchema = z.object({
   name: z.string().min(2).max(60),
   priceBRL: z.coerce.number().nonnegative('Preço inválido.'),
   casesPerMonth: z.coerce.number().int().nonnegative().default(0),
-  areas: z.coerce.number().int().nonnegative().default(1),
+  // Áreas (categorias) incluídas no combo.
+  areaIds: z.array(z.string().uuid()).default([]),
   highlights: z.array(z.string().max(80)).max(8).default([]),
 });
 export type CreatePlanInput = z.infer<typeof createPlanSchema>;
+
+/** Preço mensal de uma área do Direito (definido pelo admin). */
+export const areaPriceSchema = z.object({
+  priceBRL: z.coerce.number().nonnegative('Preço inválido.'),
+  billable: z.boolean().default(true),
+});
+export type AreaPriceInput = z.infer<typeof areaPriceSchema>;
 
 /** Assinatura de um plano SaaS (advogado). */
 export const subscribeSchema = z.object({

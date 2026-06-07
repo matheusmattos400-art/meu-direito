@@ -97,10 +97,13 @@ export default function FinanceiroPage() {
         </CardContent>
       </Card>
 
-      {/* Planos + criar novo */}
+      {/* Preço por área do Direito */}
+      <AreaPricing />
+
+      {/* Planos combo + criar novo */}
       <Card>
         <CardHeader className="flex-row items-center justify-between">
-          <CardTitle className="text-base">Planos</CardTitle>
+          <CardTitle className="text-base">Planos combo</CardTitle>
           <Button size="sm" onClick={() => setShowPlanForm((v) => !v)}>
             {showPlanForm ? 'Fechar' : '+ Novo plano'}
           </Button>
@@ -154,15 +157,104 @@ export default function FinanceiroPage() {
   );
 }
 
+interface Area {
+  id: string;
+  name: string;
+  monthlyPriceBRL: number | null;
+  billable: boolean;
+}
+
+function AreaPricing() {
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [savedId, setSavedId] = useState<string | null>(null);
+
+  function load() {
+    apiFetch<Area[]>('/admin/areas')
+      .then((a) => {
+        setAreas(a);
+        setDraft(Object.fromEntries(a.map((x) => [x.id, x.monthlyPriceBRL?.toString() ?? ''])));
+      })
+      .finally(() => setLoading(false));
+  }
+  useEffect(load, []);
+
+  async function save(id: string) {
+    const priceBRL = Number(draft[id] || 0);
+    await apiFetch(`/admin/areas/${id}/price`, {
+      method: 'POST',
+      body: JSON.stringify({ priceBRL, billable: priceBRL > 0 }),
+    });
+    setSavedId(id);
+    setTimeout(() => setSavedId(null), 1500);
+    load();
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Áreas do Direito — preço mensal</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Defina o valor de cada área. O advogado monta o combo dele somando as áreas.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Spinner className="text-muted-foreground" />
+        ) : (
+          <div className="flex flex-col divide-y divide-border">
+            {areas.map((a) => (
+              <div key={a.id} className="flex items-center justify-between gap-4 py-3">
+                <span className="text-sm">{a.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">R$</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    className="h-9 w-28"
+                    placeholder="0,00"
+                    value={draft[a.id] ?? ''}
+                    onChange={(e) => setDraft((d) => ({ ...d, [a.id]: e.target.value }))}
+                  />
+                  <Button size="sm" variant="outline" onClick={() => save(a.id)}>
+                    {savedId === a.id ? '✓' : 'Salvar'}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function NewPlanForm({ onCreated }: { onCreated: () => void }) {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [cases, setCases] = useState('');
-  const [areas, setAreas] = useState('');
   const [highlights, setHighlights] = useState('');
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiFetch<Area[]>('/admin/areas').then(setAreas).catch(() => {});
+  }, []);
+
+  function toggle(id: string) {
+    setSelected((s) => {
+      const next = new Set(s);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  // Soma das áreas escolhidas (referência para o admin definir o preço do combo).
+  const sum = areas.filter((a) => selected.has(a.id)).reduce((t, a) => t + (a.monthlyPriceBRL ?? 0), 0);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -176,7 +268,7 @@ function NewPlanForm({ onCreated }: { onCreated: () => void }) {
           name,
           priceBRL: Number(price),
           casesPerMonth: Number(cases || 0),
-          areas: Number(areas || 1),
+          areaIds: [...selected],
           highlights: highlights.split(',').map((h) => h.trim()).filter(Boolean),
         }),
       });
@@ -189,16 +281,40 @@ function NewPlanForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-3 rounded-lg border border-border bg-muted/40 p-4 sm:grid-cols-2">
-      <Input placeholder="Código (ex.: PREMIUM)" value={code} onChange={(e) => setCode(e.target.value)} required />
-      <Input placeholder="Nome (ex.: Premium)" value={name} onChange={(e) => setName(e.target.value)} required />
-      <Input type="number" step="0.01" placeholder="Preço mensal (R$)" value={price} onChange={(e) => setPrice(e.target.value)} required />
-      <Input type="number" placeholder="Casos/mês" value={cases} onChange={(e) => setCases(e.target.value)} />
-      <Input type="number" placeholder="Áreas de atuação" value={areas} onChange={(e) => setAreas(e.target.value)} />
+    <form onSubmit={submit} className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Input placeholder="Código (ex.: EMPRESARIAL)" value={code} onChange={(e) => setCode(e.target.value)} required />
+        <Input placeholder="Nome (ex.: Empresarial)" value={name} onChange={(e) => setName(e.target.value)} required />
+        <Input type="number" step="0.01" placeholder="Preço do combo (R$/mês)" value={price} onChange={(e) => setPrice(e.target.value)} required />
+        <Input type="number" placeholder="Casos/mês (opcional)" value={cases} onChange={(e) => setCases(e.target.value)} />
+      </div>
+      <div>
+        <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Áreas incluídas</p>
+        <div className="flex flex-wrap gap-2">
+          {areas.map((a) => (
+            <button
+              type="button"
+              key={a.id}
+              onClick={() => toggle(a.id)}
+              className={`rounded-full border px-3 py-1 text-sm transition-colors ${
+                selected.has(a.id) ? 'border-accent bg-accent/15 text-foreground' : 'border-border text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              {a.name}
+              {a.monthlyPriceBRL != null && <span className="ml-1 text-xs opacity-70">{brl(a.monthlyPriceBRL)}</span>}
+            </button>
+          ))}
+        </div>
+        {selected.size > 0 && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Soma avulsa das áreas: <span className="tabular-nums">{brl(sum)}</span> — defina o preço do combo (pode dar desconto).
+          </p>
+        )}
+      </div>
       <Input placeholder="Destaques (separados por vírgula)" value={highlights} onChange={(e) => setHighlights(e.target.value)} />
-      <div className="flex items-center gap-3 sm:col-span-2">
+      <div className="flex items-center gap-3">
         <Button type="submit" size="sm" disabled={busy}>
-          {busy ? <Spinner /> : 'Criar plano'}
+          {busy ? <Spinner /> : 'Criar combo'}
         </Button>
         {error && <p className="text-sm text-accent">{error}</p>}
       </div>

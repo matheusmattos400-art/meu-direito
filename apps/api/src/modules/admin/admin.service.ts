@@ -193,6 +193,58 @@ export class AdminService {
   }
 
   // ---------------- Financeiro ----------------
+  /** Lista as áreas do Direito com o preço mensal (definido pelo admin). */
+  async listAreas() {
+    const cats = await this.prisma.category.findMany({
+      where: { active: true },
+      orderBy: { name: 'asc' },
+    });
+    return cats.map((c) => ({
+      id: c.id,
+      slug: c.slug,
+      name: c.name,
+      monthlyPriceBRL: c.monthlyPriceBRL != null ? Number(c.monthlyPriceBRL) : null,
+      billable: c.billable,
+    }));
+  }
+
+  /** Define o preço mensal de uma área e se ela é ofertada como assinatura. */
+  async setAreaPrice(admin: User, categoryId: string, priceBRL: number, billable: boolean) {
+    const cat = await this.prisma.category.findUnique({ where: { id: categoryId } });
+    if (!cat) throw new NotFoundException('Área não encontrada.');
+    await this.prisma.category.update({
+      where: { id: categoryId },
+      data: { monthlyPriceBRL: priceBRL, billable },
+    });
+    await this.audit.log({
+      actorId: admin.id,
+      actorRole: 'ADMIN',
+      action: 'AREA_SET_PRICE',
+      entityType: 'Category',
+      entityId: categoryId,
+      metadata: { priceBRL, billable },
+    });
+    return { id: categoryId, monthlyPriceBRL: priceBRL, billable };
+  }
+
+  /** Lista os planos combo com as áreas incluídas. */
+  async listPlans() {
+    const plans = await this.prisma.plan.findMany({
+      orderBy: { priceBRL: 'asc' },
+      include: { planAreas: { include: { category: true } } },
+    });
+    return plans.map((p) => ({
+      id: p.id,
+      code: p.code,
+      name: p.name,
+      priceBRL: Number(p.priceBRL),
+      casesPerMonth: p.casesPerMonth,
+      active: p.active,
+      highlights: p.highlights,
+      areas: p.planAreas.map((pa) => ({ id: pa.categoryId, name: pa.category.name })),
+    }));
+  }
+
   async createPlan(admin: User, dto: CreatePlanInput) {
     const exists = await this.prisma.plan.findUnique({ where: { code: dto.code } });
     if (exists) throw new ConflictException('Já existe um plano com este código.');
@@ -203,8 +255,9 @@ export class AdminService {
         name: dto.name,
         priceBRL: dto.priceBRL,
         casesPerMonth: dto.casesPerMonth,
-        areas: dto.areas,
+        areas: dto.areaIds.length || 1,
         highlights: dto.highlights,
+        planAreas: { create: dto.areaIds.map((categoryId) => ({ categoryId })) },
       },
     });
     await this.audit.log({
@@ -213,7 +266,7 @@ export class AdminService {
       action: 'PLAN_CREATE',
       entityType: 'Plan',
       entityId: plan.id,
-      metadata: { code: plan.code },
+      metadata: { code: plan.code, areas: dto.areaIds.length },
     });
     return { id: plan.id, code: plan.code };
   }
@@ -234,7 +287,14 @@ export class AdminService {
       ]);
 
     const priceByCode = new Map(plans.map((p) => [p.code, Number(p.priceBRL)]));
-    const mrr = activeSubs.reduce((sum, s) => sum + (priceByCode.get(s.planCode) ?? 0), 0);
+    // MRR = soma do total mensal de cada assinatura (combo montado) ou do preço do plano.
+    const subAmount = (s: { monthlyTotalBRL: unknown; planCode: string | null }) =>
+      s.monthlyTotalBRL != null
+        ? Number(s.monthlyTotalBRL)
+        : s.planCode
+          ? (priceByCode.get(s.planCode) ?? 0)
+          : 0;
+    const mrr = activeSubs.reduce((sum, s) => sum + subAmount(s), 0);
 
     const byPlan = plans
       .sort((a, b) => Number(a.priceBRL) - Number(b.priceBRL))
@@ -653,7 +713,16 @@ export class AdminService {
       this.prisma.plan.findMany({ where: { active: true } }),
     ]);
     const priceByCode = new Map(plans.map((p) => [p.code, Number(p.priceBRL)]));
-    const mrr = activeSubs.reduce((s, sub) => s + (priceByCode.get(sub.planCode) ?? 0), 0);
+    const mrr = activeSubs.reduce(
+      (s, sub) =>
+        s +
+        (sub.monthlyTotalBRL != null
+          ? Number(sub.monthlyTotalBRL)
+          : sub.planCode
+            ? (priceByCode.get(sub.planCode) ?? 0)
+            : 0),
+      0,
+    );
     return {
       lawyersActive,
       lawyersPending,
