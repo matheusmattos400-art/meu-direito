@@ -114,11 +114,31 @@ export const openTicketSchema = z.object({
 });
 export type OpenTicketInput = z.infer<typeof openTicketSchema>;
 
-/** Mensagem em um chamado de suporte. */
-export const ticketMessageSchema = z.object({
-  body: z.string().min(1, 'Mensagem vazia.').max(5000),
-});
+/** Mensagem em um chamado de suporte (texto e/ou anexo). */
+export const ticketMessageSchema = z
+  .object({
+    body: z.string().max(5000).optional().default(''),
+    attachmentKey: z.string().max(512).optional(),
+    attachmentName: z.string().max(255).optional(),
+    attachmentMime: z.string().max(150).optional(),
+  })
+  .refine((d) => (d.body && d.body.trim().length > 0) || d.attachmentKey, {
+    message: 'Escreva uma mensagem ou anexe um arquivo.',
+  });
 export type TicketMessageInput = z.infer<typeof ticketMessageSchema>;
+
+/** URL assinada para anexar um arquivo (boleto/documento) no chat de suporte. */
+export const supportAttachmentUrlSchema = z.object({
+  fileName: z.string().min(1).max(255),
+  mimeType: z.string().min(1).max(150),
+});
+export type SupportAttachmentUrlInput = z.infer<typeof supportAttachmentUrlSchema>;
+
+/** Atribuição de advogado a um cliente, a partir do suporte. */
+export const assignLawyerSchema = z.object({
+  lawyerId: z.string().uuid(),
+});
+export type AssignLawyerInput = z.infer<typeof assignLawyerSchema>;
 
 /** Atualização de status de um chamado (admin). */
 export const updateTicketSchema = z.object({

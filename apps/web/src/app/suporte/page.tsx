@@ -16,6 +16,7 @@ import {
   cn,
 } from '@app/ui';
 import { apiFetch, ApiError } from '@/lib/api';
+import { getSupabaseBrowser } from '@/lib/supabase';
 
 interface TicketSummary {
   id: string;
@@ -28,6 +29,7 @@ interface Message {
   body: string;
   fromAdmin: boolean;
   createdAt: string;
+  attachment: { name: string | null; url: string } | null;
 }
 interface Thread {
   id: string;
@@ -177,6 +179,7 @@ function TicketThread({ id, onBack }: { id: string; onBack: () => void }) {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const fetchThread = useCallback(() => apiFetch<Thread>(`/support/tickets/${id}`).then(setThread), [id]);
 
@@ -202,6 +205,33 @@ function TicketThread({ id, onBack }: { id: string; onBack: () => void }) {
     }
   }
 
+  async function attach(file: File) {
+    setBusy(true);
+    try {
+      const signed = await apiFetch<{ bucket: string; path: string; token: string }>(
+        `/support/tickets/${id}/attachment-url`,
+        { method: 'POST', body: JSON.stringify({ fileName: file.name, mimeType: file.type || 'application/octet-stream' }) },
+      );
+      const supabase = getSupabaseBrowser();
+      const { error } = await supabase.storage.from(signed.bucket).uploadToSignedUrl(signed.path, signed.token, file);
+      if (error) throw error;
+      await apiFetch(`/support/tickets/${id}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({
+          body: draft || '',
+          attachmentKey: signed.path,
+          attachmentName: file.name,
+          attachmentMime: file.type || 'application/octet-stream',
+        }),
+      });
+      setDraft('');
+      await fetchThread();
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
   if (!thread) return <Spinner className="text-muted-foreground" />;
 
   return (
@@ -224,7 +254,17 @@ function TicketThread({ id, onBack }: { id: string; onBack: () => void }) {
                 m.fromAdmin ? 'self-start border border-border bg-card' : 'self-end bg-primary text-primary-foreground',
               )}
             >
-              <p className="whitespace-pre-wrap">{m.body}</p>
+              {m.body && <p className="whitespace-pre-wrap">{m.body}</p>}
+              {m.attachment && (
+                <a
+                  href={m.attachment.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={cn('mt-1 inline-flex items-center gap-1 text-xs underline', m.fromAdmin ? 'text-accent' : '')}
+                >
+                  📎 {m.attachment.name ?? 'arquivo'}
+                </a>
+              )}
               <p className={cn('mt-1 text-[10px]', m.fromAdmin ? 'text-muted-foreground' : 'text-primary-foreground/70')}>
                 {m.fromAdmin ? 'Equipe' : 'Você'} · {new Date(m.createdAt).toLocaleString('pt-BR')}
               </p>
@@ -239,7 +279,21 @@ function TicketThread({ id, onBack }: { id: string; onBack: () => void }) {
       ) : (
         <div className="flex flex-col gap-2">
           <Textarea rows={3} placeholder="Escreva sua mensagem..." value={draft} onChange={(e) => setDraft(e.target.value)} />
-          <Button onClick={send} disabled={busy} className="self-start">Enviar</Button>
+          <div className="flex gap-2">
+            <Button onClick={send} disabled={busy}>Enviar</Button>
+            <input
+              ref={fileRef}
+              type="file"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) attach(f);
+              }}
+            />
+            <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={busy}>
+              📎 Anexar
+            </Button>
+          </div>
         </div>
       )}
     </div>

@@ -3,8 +3,10 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { User } from '@app/db';
 import {
   openTicketSchema,
+  supportAttachmentUrlSchema,
   ticketMessageSchema,
   type OpenTicketInput,
+  type SupportAttachmentUrlInput,
   type TicketMessageInput,
 } from '@app/validation';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -39,12 +41,24 @@ export class SupportController {
   }
 
   @Post('tickets/:id/messages')
-  @ApiOperation({ summary: 'Envia uma mensagem no chamado.' })
+  @ApiOperation({ summary: 'Envia uma mensagem (texto e/ou anexo) no chamado.' })
   reply(
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(ticketMessageSchema)) dto: TicketMessageInput,
   ) {
-    return this.support.reply(user, id, dto.body, false).then((data) => ({ data }));
+    return this.support.reply(user, id, dto, false).then((data) => ({ data }));
+  }
+
+  @Post('tickets/:id/attachment-url')
+  @ApiOperation({ summary: 'URL assinada para anexar arquivo no chat.' })
+  attachmentUrl(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(supportAttachmentUrlSchema)) dto: SupportAttachmentUrlInput,
+  ) {
+    return this.support
+      .attachmentUploadUrl(user, id, dto.fileName, dto.mimeType, false)
+      .then((data) => ({ data }));
   }
 }

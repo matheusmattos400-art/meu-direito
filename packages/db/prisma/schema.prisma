@@ -669,6 +669,10 @@ model SupportMessage {
   author     User          @relation(fields: [authorId], references: [id])
   authorRole UserRole
   body       String
+  // Anexo opcional (boleto/documento) no Storage
+  attachmentKey  String?
+  attachmentName String?
+  attachmentMime String?
   createdAt  DateTime      @default(now())
 
   @@index([ticketId, createdAt])
