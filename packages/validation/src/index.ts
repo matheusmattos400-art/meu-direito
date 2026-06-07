@@ -88,6 +88,18 @@ export const moveKanbanCardSchema = z.object({
 });
 export type MoveKanbanCardInput = z.infer<typeof moveKanbanCardSchema>;
 
+/** Adiciona um processo para acompanhamento (Datajud). */
+export const addProcessSchema = z.object({
+  processNumber: z
+    .string()
+    .min(15, 'Número de processo inválido.')
+    .max(30)
+    .regex(/[\d.\-]+/, 'Use apenas números e os separadores . -'),
+  court: z.string().max(40).optional(),
+  caseId: z.string().uuid().optional(),
+});
+export type AddProcessInput = z.infer<typeof addProcessSchema>;
+
 /** Criação de uma peça (documento gerado). */
 export const createPecaSchema = z.object({
   caseId: z.string().uuid(),

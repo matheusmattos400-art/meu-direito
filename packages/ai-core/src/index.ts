@@ -11,6 +11,8 @@ export * from './guardrails/disclaimer.js';
 export * from './guardrails/prompt-injection.js';
 export * from './prompts/triage.js';
 export * from './prompts/pecas.js';
+export * from './prompts/processos.js';
 export * from './triage/schema.js';
 export * from './triage/index.js';
 export * from './editor/index.js';
+export * from './processos/index.js';
