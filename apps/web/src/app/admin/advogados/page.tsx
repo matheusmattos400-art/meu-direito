@@ -4,12 +4,18 @@ import { useEffect, useState } from 'react';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
 
+interface LawyerDoc {
+  id: string;
+  fileName: string;
+  downloadUrl: string;
+}
 interface PendingLawyer {
   lawyerId: string;
   name: string | null;
   email: string | null;
   oab: string;
   specialties: string[];
+  documents: LawyerDoc[];
   createdAt: string;
 }
 
@@ -64,10 +70,33 @@ export default function AdminAdvogadosPage() {
                   OAB {l.oab} · {l.email ?? 'sem e-mail'}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex items-center justify-between gap-4">
+              <CardContent className="flex flex-col gap-4">
                 <span className="text-sm text-muted-foreground">
                   {l.specialties.join(', ') || 'Sem áreas'}
                 </span>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">
+                    Documentos enviados
+                  </p>
+                  {l.documents.length === 0 ? (
+                    <p className="text-xs text-accent">Nenhum documento enviado.</p>
+                  ) : (
+                    <ul className="flex flex-wrap gap-2">
+                      {l.documents.map((d) => (
+                        <li key={d.id}>
+                          <a
+                            href={d.downloadUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted"
+                          >
+                            {d.fileName}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <Button size="sm" disabled={acting === l.lawyerId} onClick={() => decide(l.lawyerId, 'verify')}>
                     Validar

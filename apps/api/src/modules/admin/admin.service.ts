@@ -3,29 +3,44 @@ import type { User } from '@app/db';
 import type { RejectLawyerInput } from '@app/validation';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
+import { StorageService } from '../../common/storage/storage.service';
 
 @Injectable()
 export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly storage: StorageService,
   ) {}
 
   // ---------------- Validação de OAB ----------------
   async listPendingLawyers() {
     const lawyers = await this.prisma.lawyer.findMany({
       where: { verification: 'PENDING' },
-      include: { user: true, specialties: { include: { category: true } } },
+      include: {
+        user: true,
+        specialties: { include: { category: true } },
+        verificationDocuments: { where: { deletedAt: null } },
+      },
       orderBy: { createdAt: 'asc' },
     });
-    return lawyers.map((l) => ({
-      lawyerId: l.id,
-      name: l.user.fullName,
-      email: l.user.email,
-      oab: `${l.oabNumber}/${l.oabState}`,
-      specialties: l.specialties.map((s) => s.category.name),
-      createdAt: l.createdAt,
-    }));
+    return Promise.all(
+      lawyers.map(async (l) => ({
+        lawyerId: l.id,
+        name: l.user.fullName,
+        email: l.user.email,
+        oab: `${l.oabNumber}/${l.oabState}`,
+        specialties: l.specialties.map((s) => s.category.name),
+        documents: await Promise.all(
+          l.verificationDocuments.map(async (d) => ({
+            id: d.id,
+            fileName: d.fileName,
+            downloadUrl: await this.storage.createDownloadUrl(d.storageKey),
+          })),
+        ),
+        createdAt: l.createdAt,
+      })),
+    );
   }
 
   async verifyLawyer(admin: User, lawyerId: string) {

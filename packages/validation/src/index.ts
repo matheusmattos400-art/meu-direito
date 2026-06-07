@@ -131,6 +131,22 @@ export const pecaAiSchema = z.object({
 });
 export type PecaAiInput = z.infer<typeof pecaAiSchema>;
 
+/** URL assinada para upload de documento de verificação de OAB. */
+export const verificationUploadUrlSchema = z.object({
+  fileName: z.string().min(1).max(255),
+  mimeType: z.string().min(1).max(150),
+});
+export type VerificationUploadUrlInput = z.infer<typeof verificationUploadUrlSchema>;
+
+/** Registro do documento de verificação de OAB após upload. */
+export const registerVerificationDocSchema = z.object({
+  storageKey: z.string().min(1).max(512),
+  fileName: z.string().min(1).max(255),
+  mimeType: z.string().min(1).max(150),
+  sizeBytes: z.number().int().nonnegative(),
+});
+export type RegisterVerificationDocInput = z.infer<typeof registerVerificationDocSchema>;
+
 /** Validação de OAB no cadastro do advogado. */
 export const lawyerRegistrationSchema = z.object({
   fullName: z.string().min(3).max(200),

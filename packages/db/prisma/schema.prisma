@@ -116,6 +116,11 @@ enum ConsentTermType {
   DOCUMENT_UPLOAD
 }
 
+enum DocumentPurpose {
+  CASE // documento anexado a um caso
+  LAWYER_VERIFICATION // comprovante de OAB do advogado
+}
+
 // ----------------------- IDENTIDADE -----------------------
 model User {
   id         String     @id @default(uuid())
@@ -161,12 +166,13 @@ model Lawyer {
   bio          String?
   officeName   String?
 
-  specialties   LawyerSpecialty[]
-  assignments   CaseAssignment[]
-  generatedDocs GeneratedDocument[]
-  monitorings   ProcessMonitoring[]
-  reviews       Review[]
-  kanbanStages  KanbanStage[]
+  specialties           LawyerSpecialty[]
+  assignments           CaseAssignment[]
+  generatedDocs         GeneratedDocument[]
+  monitorings           ProcessMonitoring[]
+  reviews               Review[]
+  kanbanStages          KanbanStage[]
+  verificationDocuments Document[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -312,11 +318,14 @@ model KanbanStage {
 
 // ----------------------- DOCUMENTOS -----------------------
 model Document {
-  id           String  @id @default(uuid())
+  id           String          @id @default(uuid())
+  purpose      DocumentPurpose @default(CASE)
   caseId       String?
-  case         Case?   @relation(fields: [caseId], references: [id])
+  case         Case?           @relation(fields: [caseId], references: [id])
+  lawyerId     String? // preenchido quando é comprovante de OAB
+  lawyer       Lawyer?         @relation(fields: [lawyerId], references: [id])
   uploadedById String
-  uploadedBy   User    @relation(fields: [uploadedById], references: [id])
+  uploadedBy   User            @relation(fields: [uploadedById], references: [id])
 
   storageBucket String // guardamos referência, não o binário
   storageKey    String // caminho no Supabase Storage
