@@ -10,12 +10,14 @@ import type { Case, User } from '@app/db';
 import type { SendTriageMessageInput, StartTriageInput } from '@app/validation';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
+import { RagService } from '../knowledge/rag.service';
 
 @Injectable()
 export class CasosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly rag: RagService,
   ) {}
 
   // ---------------- Cidadão: iniciar triagem ----------------
@@ -41,7 +43,12 @@ export class CasosService {
       },
     });
 
-    const reply = await generateTriageReply({ history: [], userMessage: dto.narrative });
+    const legalContext = await this.rag.buildContext(dto.narrative);
+    const reply = await generateTriageReply({
+      history: [],
+      userMessage: dto.narrative,
+      legalContext,
+    });
     const assistant = await this.persistAssistant(caseRecord.id, reply);
 
     await this.audit.log({
@@ -74,10 +81,12 @@ export class CasosService {
       },
     });
 
+    const legalContext = await this.rag.buildContext(dto.content);
     const reply = await generateTriageReply({
       history,
       userMessage: dto.content,
       sensitive: caseRecord.sensitivity === 'SENSITIVE',
+      legalContext,
     });
     const assistant = await this.persistAssistant(caseId, reply);
 
@@ -98,8 +107,12 @@ export class CasosService {
       include: { subcategories: { where: { active: true } } },
     });
 
+    const legalContext = await this.rag.buildContext(
+      history.map((m) => m.content).join('\n'),
+    );
     const analysis = await analyzeTriage({
       history,
+      legalContext,
       categories: categories.map((c) => ({
         slug: c.slug,
         name: c.name,

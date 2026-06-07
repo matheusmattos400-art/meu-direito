@@ -16,3 +16,4 @@ export * from './triage/schema.js';
 export * from './triage/index.js';
 export * from './editor/index.js';
 export * from './processos/index.js';
+export * from './rag/index.js';

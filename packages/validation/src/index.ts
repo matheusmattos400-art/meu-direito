@@ -131,6 +131,15 @@ export const pecaAiSchema = z.object({
 });
 export type PecaAiInput = z.infer<typeof pecaAiSchema>;
 
+/** Ingestão de um documento na base de conhecimento (RAG). */
+export const ingestKnowledgeSchema = z.object({
+  title: z.string().min(1).max(200),
+  source: z.string().min(1).max(200),
+  type: z.enum(['LEGISLATION', 'JURISPRUDENCE', 'ADMINISTRATIVE', 'INTERNAL']),
+  content: z.string().min(20).max(200_000),
+});
+export type IngestKnowledgeInput = z.infer<typeof ingestKnowledgeSchema>;
+
 /** URL assinada para upload de documento de verificação de OAB. */
 export const verificationUploadUrlSchema = z.object({
   fileName: z.string().min(1).max(255),

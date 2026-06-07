@@ -45,7 +45,17 @@ export interface TriageReplyParams {
   history: TriageMessage[];
   userMessage: string;
   sensitive?: boolean;
+  /** Trechos jurídicos recuperados via RAG (referência, pode estar incompleto). */
+  legalContext?: string;
   model?: ResolveModelOptions;
+}
+
+function withLegalContext(system: string, legalContext?: string): string {
+  if (!legalContext) return system;
+  return `${system}
+
+CONTEXTO JURÍDICO RECUPERADO (referência; pode estar incompleto — não cite como verdade absoluta e não invente além disto):
+${legalContext}`;
 }
 
 export interface TriageReplyResult {
@@ -81,8 +91,10 @@ export async function generateTriageReply(
   }
 
   const provider = params.model?.provider ?? getDefaultProvider();
-  const system =
-    TRIAGE_SYSTEM_PROMPT + (params.sensitive ? `\n\n${SENSITIVE_CASE_NOTE}` : '');
+  const system = withLegalContext(
+    TRIAGE_SYSTEM_PROMPT + (params.sensitive ? `\n\n${SENSITIVE_CASE_NOTE}` : ''),
+    params.legalContext,
+  );
 
   const messages: CoreMessage[] = [
     ...histR.messages.map((m) => ({ role: m.role, content: m.content })),
@@ -115,6 +127,7 @@ export interface AvailableCategory {
 export interface AnalyzeTriageParams {
   history: TriageMessage[];
   categories: AvailableCategory[];
+  legalContext?: string;
   model?: ResolveModelOptions;
 }
 
@@ -165,10 +178,13 @@ export async function analyzeTriage(
     )
     .join('\n');
 
-  const system = `${TRIAGE_SYSTEM_PROMPT}
+  const system = withLegalContext(
+    `${TRIAGE_SYSTEM_PROMPT}
 
 TAREFA: produza a análise estruturada da triagem. Use SOMENTE os slugs de categoria/subcategoria abaixo (ou null se nenhum se aplicar):
-${catalog}`;
+${catalog}`,
+    params.legalContext,
+  );
 
   const conversation = histR.messages
     .map((m) => `${m.role === 'user' ? 'Cidadão' : 'Assistente'}: ${m.content}`)

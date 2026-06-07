@@ -50,6 +50,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Link href="/admin/usuarios" className="hover:text-foreground">
               Usuários
             </Link>
+            <Link href="/admin/conhecimento" className="hover:text-foreground">
+              Conhecimento
+            </Link>
           </nav>
         </div>
       </header>

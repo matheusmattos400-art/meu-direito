@@ -20,6 +20,7 @@ import { DocumentsModule } from './modules/documents/documents.module';
 import { PecasModule } from './modules/pecas/pecas.module';
 import { ProcessosModule } from './modules/processos/processos.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -41,6 +42,7 @@ import { HealthController } from './health.controller';
     PecasModule,
     ProcessosModule,
     BillingModule,
+    KnowledgeModule,
   ],
   controllers: [HealthController],
   providers: [

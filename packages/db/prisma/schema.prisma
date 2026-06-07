@@ -7,13 +7,14 @@
 // ============================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  // extensions = [pgvector] // habilitar na etapa de RAG (@app/ai-core)
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
 }
 
 // ----------------------- ENUMS -----------------------
@@ -119,6 +120,13 @@ enum ConsentTermType {
 enum DocumentPurpose {
   CASE // documento anexado a um caso
   LAWYER_VERIFICATION // comprovante de OAB do advogado
+}
+
+enum KnowledgeType {
+  LEGISLATION // legislação
+  JURISPRUDENCE // jurisprudência
+  ADMINISTRATIVE // normas / entendimentos administrativos
+  INTERNAL // base interna validada
 }
 
 // ----------------------- IDENTIDADE -----------------------
@@ -566,4 +574,31 @@ model AdminNote {
   updatedAt     DateTime @updatedAt
 
   @@map("admin_notes")
+}
+
+// ----------------------- BASE DE CONHECIMENTO (RAG) -----------------------
+model KnowledgeDocument {
+  id        String        @id @default(uuid())
+  title     String
+  source    String // referência da fonte (ex.: "CDC art. 18")
+  type      KnowledgeType
+  createdAt DateTime      @default(now())
+
+  chunks KnowledgeChunk[]
+
+  @@map("knowledge_documents")
+}
+
+model KnowledgeChunk {
+  id         String            @id @default(uuid())
+  documentId String
+  document   KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  content    String
+  source     String
+  // Embedding vetorial (pgvector). Manipulado via SQL bruto (operador <=>).
+  embedding  Unsupported("vector(1536)")?
+  createdAt  DateTime          @default(now())
+
+  @@index([documentId])
+  @@map("knowledge_chunks")
 }
