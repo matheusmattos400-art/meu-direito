@@ -169,8 +169,15 @@ export class AdminController {
 
   @Get('people')
   @RequireScope('CADASTROS')
-  @ApiOperation({ summary: 'Pessoas cadastradas (nome, telefone, região, sexo).' })
+  @ApiOperation({ summary: 'Cidadãos cadastrados (nome, telefone, região, sexo).' })
   people() {
     return this.admin.listPeople().then((data) => ({ data }));
+  }
+
+  @Get('people/:id')
+  @RequireScope('CADASTROS')
+  @ApiOperation({ summary: 'Ficha do cidadão + processo aberto com advogado, se houver.' })
+  person(@Param('id', ParseUUIDPipe) id: string) {
+    return this.admin.getPerson(id).then((data) => ({ data }));
   }
 }

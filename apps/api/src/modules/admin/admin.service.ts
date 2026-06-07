@@ -674,24 +674,54 @@ export class AdminService {
     return { open, inProgress, resolved, avgResponseMinutes };
   }
 
-  /** Registro de todas as pessoas cadastradas (nome, telefone, região, sexo). */
+  /** Cadastros de cidadãos (nome, telefone, região, sexo) — advogados têm aba própria. */
   async listPeople() {
     const users = await this.prisma.user.findMany({
-      where: { role: { in: ['CITIZEN', 'LAWYER'] } },
-      include: { lawyer: { select: { phone: true, oabState: true, city: true } } },
+      where: { role: 'CITIZEN' },
       orderBy: { createdAt: 'desc' },
     });
     const GENDER: Record<string, string> = { M: 'Masculino', F: 'Feminino', OUTRO: 'Outro' };
     return users.map((u) => ({
       id: u.id,
       name: u.fullName,
-      phone: u.phone ?? u.lawyer?.phone ?? null,
-      city: u.city ?? u.lawyer?.city ?? null,
-      state: u.state ?? u.lawyer?.oabState ?? null,
+      phone: u.phone,
+      city: u.city,
+      state: u.state,
       gender: u.gender ? (GENDER[u.gender] ?? u.gender) : null,
-      role: u.role,
       createdAt: u.createdAt,
     }));
+  }
+
+  /** Ficha de um cidadão + se tem processo aberto com advogado da plataforma. */
+  async getPerson(id: string) {
+    const u = await this.prisma.user.findFirst({ where: { id, role: 'CITIZEN' } });
+    if (!u) throw new NotFoundException('Cidadão não encontrado.');
+
+    const a = await this.prisma.caseAssignment.findFirst({
+      where: { status: 'ACCEPTED', case: { citizenId: id } },
+      orderBy: { respondedAt: 'desc' },
+      include: { lawyer: { include: { user: true } }, case: true },
+    });
+
+    const GENDER: Record<string, string> = { M: 'Masculino', F: 'Feminino', OUTRO: 'Outro' };
+    return {
+      id: u.id,
+      name: u.fullName,
+      email: u.email,
+      phone: u.phone,
+      city: u.city,
+      state: u.state,
+      gender: u.gender ? (GENDER[u.gender] ?? u.gender) : null,
+      createdAt: u.createdAt,
+      process: a
+        ? {
+            protocol: a.case.protocol,
+            caseStatus: a.case.status,
+            lawyerName: a.lawyer.user.fullName,
+            lawyerOab: `${a.lawyer.oabNumber}/${a.lawyer.oabState}`,
+          }
+        : null,
+    };
   }
 
   /** Contadores para os badges de notificação do menu admin. */

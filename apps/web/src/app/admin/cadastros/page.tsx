@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Badge, Card, CardContent, Input, Spinner } from '@app/ui';
+import Link from 'next/link';
+import { Card, CardContent, Input, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
 
 interface Person {
@@ -11,7 +12,6 @@ interface Person {
   city: string | null;
   state: string | null;
   gender: string | null;
-  role: 'CITIZEN' | 'LAWYER';
   createdAt: string;
 }
 
@@ -54,7 +54,8 @@ export default function CadastrosPage() {
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Base</p>
         <h1 className="mt-1 font-serif text-4xl tracking-tightish">Cadastros</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Todas as pessoas cadastradas no app, por região. Total: {people.length}.
+          Cidadãos cadastrados no app, por região. Clique no nome para ver os dados e o processo.
+          Total: {people.length}.
         </p>
       </header>
 
@@ -90,21 +91,19 @@ export default function CadastrosPage() {
                           <th className="px-4 py-3 font-medium">Telefone</th>
                           <th className="px-4 py-3 font-medium">Cidade</th>
                           <th className="px-4 py-3 font-medium">Sexo</th>
-                          <th className="px-4 py-3 font-medium">Tipo</th>
                         </tr>
                       </thead>
                       <tbody>
                         {list.map((p) => (
-                          <tr key={p.id} className="border-b border-border last:border-0">
-                            <td className="px-4 py-3">{p.name ?? '—'}</td>
+                          <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/50">
+                            <td className="px-4 py-3">
+                              <Link href={`/admin/cadastros/${p.id}`} className="hover:underline">
+                                {p.name ?? '— (sem nome)'}
+                              </Link>
+                            </td>
                             <td className="px-4 py-3 text-muted-foreground">{p.phone ?? '—'}</td>
                             <td className="px-4 py-3 text-muted-foreground">{p.city ?? '—'}</td>
                             <td className="px-4 py-3 text-muted-foreground">{p.gender ?? '—'}</td>
-                            <td className="px-4 py-3">
-                              <Badge variant={p.role === 'LAWYER' ? 'accent' : 'neutral'}>
-                                {p.role === 'LAWYER' ? 'Advogado' : 'Cidadão'}
-                              </Badge>
-                            </td>
                           </tr>
                         ))}
                       </tbody>
