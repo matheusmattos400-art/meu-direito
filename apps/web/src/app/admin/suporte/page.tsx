@@ -50,6 +50,9 @@ export default function SuporteAdminPage() {
       <header>
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Atendimento</p>
         <h1 className="mt-1 font-serif text-4xl tracking-tightish">Suporte</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Reclamações e dúvidas dos usuários sobre a plataforma (advogados e público).
+        </p>
       </header>
 
       <div className="flex flex-wrap gap-2 border-b border-border pb-3">

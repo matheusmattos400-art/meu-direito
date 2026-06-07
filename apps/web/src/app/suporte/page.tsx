@@ -65,9 +65,10 @@ export default function SuportePage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-6 py-16">
-      <h1 className="mb-2 font-serif text-3xl tracking-tightish">Suporte</h1>
+      <h1 className="mb-2 font-serif text-3xl tracking-tightish">Suporte da plataforma</h1>
       <p className="mb-8 text-sm text-muted-foreground">
-        Precisa de ajuda? Abra um chamado e converse com a nossa equipe.
+        Problemas, dúvidas ou reclamações sobre o uso do aplicativo? Fale com a nossa equipe.
+        (Este canal é sobre a plataforma — não sobre questões jurídicas.)
       </p>
 
       {selected ? (
@@ -132,12 +133,12 @@ function NewTicket({ onCreated }: { onCreated: (id: string) => void }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Abrir um chamado</CardTitle>
-        <CardDescription>Conte o que está acontecendo — respondemos por aqui.</CardDescription>
+        <CardDescription>Relate um problema, dúvida ou reclamação sobre a plataforma.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={submit} className="flex flex-col gap-3">
-          <Input placeholder="Assunto" value={subject} onChange={(e) => setSubject(e.target.value)} required />
-          <Textarea rows={4} placeholder="Descreva sua dúvida ou reclamação..." value={message} onChange={(e) => setMessage(e.target.value)} required />
+          <Input placeholder="Assunto (ex.: erro ao enviar documento)" value={subject} onChange={(e) => setSubject(e.target.value)} required />
+          <Textarea rows={4} placeholder="Descreva o problema ou a reclamação sobre o app..." value={message} onChange={(e) => setMessage(e.target.value)} required />
           <div className="flex items-center gap-3">
             <Button type="submit" disabled={busy}>{busy ? <Spinner /> : 'Abrir chamado'}</Button>
             {error && <p className="text-sm text-accent">{error}</p>}
