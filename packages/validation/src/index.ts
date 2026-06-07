@@ -88,6 +88,13 @@ export const moveKanbanCardSchema = z.object({
 });
 export type MoveKanbanCardInput = z.infer<typeof moveKanbanCardSchema>;
 
+/** Assinatura de um plano SaaS (advogado). */
+export const subscribeSchema = z.object({
+  planCode: z.string().min(1).max(40),
+  method: z.enum(['PIX', 'BOLETO', 'CREDIT_CARD']).default('PIX'),
+});
+export type SubscribeInput = z.infer<typeof subscribeSchema>;
+
 /** Adiciona um processo para acompanhamento (Datajud). */
 export const addProcessSchema = z.object({
   processNumber: z

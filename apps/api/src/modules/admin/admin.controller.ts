@@ -42,6 +42,18 @@ export class AdminController {
     return this.admin.listUsers().then((data) => ({ data }));
   }
 
+  @Post('users/:userId/promote')
+  @ApiOperation({ summary: 'Promove um usuário a administrador (sem exigir OAB).' })
+  promote(@CurrentUser() user: User, @Param('userId', ParseUUIDPipe) userId: string) {
+    return this.admin.promoteToAdmin(user, userId).then((data) => ({ data }));
+  }
+
+  @Post('users/:userId/revoke-admin')
+  @ApiOperation({ summary: 'Remove o acesso de administrador de um usuário.' })
+  revoke(@CurrentUser() user: User, @Param('userId', ParseUUIDPipe) userId: string) {
+    return this.admin.revokeAdmin(user, userId).then((data) => ({ data }));
+  }
+
   @Get('audit')
   @ApiOperation({ summary: 'Lista os registros de auditoria mais recentes.' })
   audit() {

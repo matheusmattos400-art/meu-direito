@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { User } from '@app/db';
 import type { RejectLawyerInput } from '@app/validation';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -84,6 +84,41 @@ export class AdminService {
       fullName: u.fullName,
       createdAt: u.createdAt,
     }));
+  }
+
+  /** Promove um usuário a ADMIN (acesso interno; não exige OAB). */
+  async promoteToAdmin(admin: User, userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuário não encontrado.');
+
+    await this.prisma.user.update({ where: { id: userId }, data: { role: 'ADMIN' } });
+    await this.audit.log({
+      actorId: admin.id,
+      actorRole: 'ADMIN',
+      action: 'ADMIN_GRANT',
+      entityType: 'User',
+      entityId: userId,
+    });
+    return { userId, role: 'ADMIN' };
+  }
+
+  /** Rebaixa um ADMIN de volta a CITIZEN (sem auto-rebaixamento). */
+  async revokeAdmin(admin: User, userId: string) {
+    if (admin.id === userId) {
+      throw new BadRequestException('Você não pode remover o seu próprio acesso de administrador.');
+    }
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuário não encontrado.');
+
+    await this.prisma.user.update({ where: { id: userId }, data: { role: 'CITIZEN' } });
+    await this.audit.log({
+      actorId: admin.id,
+      actorRole: 'ADMIN',
+      action: 'ADMIN_REVOKE',
+      entityType: 'User',
+      entityId: userId,
+    });
+    return { userId, role: 'CITIZEN' };
   }
 
   async listAuditLogs() {

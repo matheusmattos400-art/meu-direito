@@ -15,6 +15,9 @@ export default function AdvogadoLayout({ children }: { children: React.ReactNode
             <Link href="/advogado/casos" className="hover:text-foreground">
               Meus casos
             </Link>
+            <Link href="/advogado/planos" className="hover:text-foreground">
+              Planos
+            </Link>
           </nav>
         </div>
       </header>

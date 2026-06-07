@@ -19,6 +19,7 @@ import { ConsentModule } from './modules/consent/consent.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { PecasModule } from './modules/pecas/pecas.module';
 import { ProcessosModule } from './modules/processos/processos.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -39,6 +40,7 @@ import { HealthController } from './health.controller';
     DocumentsModule,
     PecasModule,
     ProcessosModule,
+    BillingModule,
   ],
   controllers: [HealthController],
   providers: [
