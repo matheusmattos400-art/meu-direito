@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: Build & typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable Corepack (pnpm)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @app/db generate
+
+      # Compila pacotes e apps em ordem topológica (inclui nest build e next build).
+      - name: Build
+        run: pnpm -r build
+        env:
+          # next build não deve falhar por ausência de envs em runtime.
+          NEXT_TELEMETRY_DISABLED: "1"

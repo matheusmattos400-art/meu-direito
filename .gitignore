@@ -1,0 +1,40 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build outputs
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# next auto-gerado
+next-env.d.ts
+
+# turbo
+.turbo/
+
+# env / secrets — NUNCA versionar (LGPD/segurança)
+.env
+.env.*
+!.env.example
+
+# prisma
+packages/db/prisma/*.db
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# os / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.recommended.json
+.idea/
+
+# testes / coverage
+coverage/

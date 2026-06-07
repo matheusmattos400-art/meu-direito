@@ -1,0 +1,560 @@
+// ============================================================
+// Meu Direito — modelo lógico inicial (v0.1)
+// Postgres (Supabase / São Paulo) + Prisma
+// Convenções: id UUID; createdAt/updatedAt em entidades mutáveis;
+// deletedAt/anonymizedAt p/ direito ao esquecimento (LGPD);
+// AuditLog imutável (sem updatedAt/deletedAt).
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // extensions = [pgvector] // habilitar na etapa de RAG (@app/ai-core)
+}
+
+// ----------------------- ENUMS -----------------------
+enum UserRole {
+  CITIZEN
+  LAWYER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING_VERIFICATION
+  SUSPENDED
+  DELETED
+}
+
+enum LawyerVerification {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum CaseStatus {
+  SUBMITTED // relato enviado pelo cidadão
+  TRIAGING // IA em triagem
+  TRIAGED // triagem concluída
+  RESOLVED_INFO // dúvida simples resolvida (sem potencial jurídico)
+  QUALIFIED // caso qualificado para atendimento
+  AVAILABLE // oportunidade publicada a advogados
+  ASSIGNED // aceito por advogado
+  IN_PROGRESS
+  CLOSED
+  ARCHIVED
+}
+
+enum CasePotential {
+  DOUBT
+  ADMINISTRATIVE
+  JUDICIAL
+}
+
+enum CaseSensitivity {
+  NORMAL
+  SENSITIVE // muda a UI do chat (privacidade reforçada)
+}
+
+enum AssignmentStatus {
+  OFFERED
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+  EXPIRED
+}
+
+enum AiMessageRole {
+  SYSTEM
+  USER
+  ASSISTANT
+}
+
+enum AiContext {
+  CITIZEN_TRIAGE
+  LAWYER_EDITOR
+}
+
+enum GeneratedDocType {
+  TRIAGE_REPORT
+  DRAFT_PETITION
+  PETITION
+  OTHER
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CHARGEBACK
+}
+
+enum PaymentMethod {
+  PIX
+  BOLETO
+  CREDIT_CARD
+}
+
+enum ConsentTermType {
+  TERMS_OF_USE
+  PRIVACY_POLICY
+  DATA_PROCESSING // tratamento de dados pessoais
+  INTERNATIONAL_TRANSFER // envio pseudonimizado a LLM no exterior
+  DOCUMENT_UPLOAD
+}
+
+// ----------------------- IDENTIDADE -----------------------
+model User {
+  id         String     @id @default(uuid())
+  authUserId String?    @unique // id do Supabase Auth
+  role       UserRole   @default(CITIZEN)
+  status     UserStatus @default(ACTIVE)
+  email      String?    @unique
+  phone      String?    @unique
+  fullName   String?
+  city       String? // localização minimizada (LGPD)
+  state      String?    @db.Char(2)
+
+  lawyer             Lawyer?
+  cases              Case[]
+  aiMessages         AiMessage[]
+  documents          Document[]
+  consents           UserConsent[]
+  reviews            Review[]
+  subscriptions      Subscription[]
+  payments           Payment[]
+  auditLogs          AuditLog[]
+  processes          ProcessMonitoring[]
+  adminNotesAuthored AdminNote[]         @relation("AdminNoteAuthor")
+  adminNotesAbout    AdminNote[]         @relation("NotesAboutUser")
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime? // soft delete (LGPD)
+  anonymizedAt DateTime? // anonimização (LGPD)
+
+  @@index([role, status])
+  @@map("users")
+}
+
+model Lawyer {
+  id           String             @id @default(uuid())
+  userId       String             @unique
+  user         User               @relation(fields: [userId], references: [id])
+  oabNumber    String
+  oabState     String             @db.Char(2)
+  verification LawyerVerification @default(PENDING)
+  verifiedAt   DateTime?
+  bio          String?
+  officeName   String?
+
+  specialties   LawyerSpecialty[]
+  assignments   CaseAssignment[]
+  generatedDocs GeneratedDocument[]
+  monitorings   ProcessMonitoring[]
+  reviews       Review[]
+  kanbanStages  KanbanStage[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([oabNumber, oabState])
+  @@map("lawyers")
+}
+
+// ----------------------- TAXONOMIA -----------------------
+model Category {
+  id          String  @id @default(uuid())
+  slug        String  @unique
+  name        String
+  description String?
+  active      Boolean @default(true)
+
+  subcategories Subcategory[]
+  cases         Case[]
+  specialties   LawyerSpecialty[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("categories")
+}
+
+model Subcategory {
+  id         String   @id @default(uuid())
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  slug       String
+  name       String
+  active     Boolean  @default(true)
+
+  cases Case[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([categoryId, slug])
+  @@map("subcategories")
+}
+
+model LawyerSpecialty {
+  id         String   @id @default(uuid())
+  lawyerId   String
+  lawyer     Lawyer   @relation(fields: [lawyerId], references: [id])
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@unique([lawyerId, categoryId])
+  @@map("lawyer_specialties")
+}
+
+// ----------------------- CASOS / TRIAGEM -----------------------
+model Case {
+  id        String @id @default(uuid())
+  protocol  String @unique // protocolo amigável p/ o cidadão
+  citizenId String
+  citizen   User   @relation(fields: [citizenId], references: [id])
+
+  categoryId    String?
+  category      Category?    @relation(fields: [categoryId], references: [id])
+  subcategoryId String?
+  subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id])
+
+  status      CaseStatus      @default(SUBMITTED)
+  potential   CasePotential?
+  sensitivity CaseSensitivity @default(NORMAL)
+
+  title        String? // gerado pela IA
+  rawNarrative String? // relato original do cidadão
+  aiSummary    String? // resumo estruturado
+  aiRisks      Json? // riscos apontados
+  missingDocs  Json? // documentos ausentes
+  nextSteps    Json? // próximos passos
+  adminPaths   Json? // caminhos administrativos
+  aiConfidence Float?
+
+  city  String? // minimizada (mapa de calor)
+  state String? @db.Char(2)
+
+  assignments   CaseAssignment[]
+  documents     Document[]
+  aiMessages    AiMessage[]
+  generatedDocs GeneratedDocument[]
+  monitorings   ProcessMonitoring[]
+  reviews       Review[]
+  adminNotes    AdminNote[]         @relation("NotesAboutCase")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  triagedAt DateTime?
+  closedAt  DateTime?
+  deletedAt DateTime?
+
+  @@index([status])
+  @@index([categoryId, subcategoryId])
+  @@index([city, state])
+  @@map("cases")
+}
+
+model CaseAssignment {
+  id       String           @id @default(uuid())
+  caseId   String
+  case     Case             @relation(fields: [caseId], references: [id])
+  lawyerId String
+  lawyer   Lawyer           @relation(fields: [lawyerId], references: [id])
+  status   AssignmentStatus @default(OFFERED)
+
+  kanbanStageId String?
+  kanbanStage   KanbanStage? @relation(fields: [kanbanStageId], references: [id])
+
+  offeredAt     DateTime  @default(now())
+  respondedAt   DateTime?
+  declineReason String?
+  // OAB: NÃO existe campo de % de honorário/comissão. Receita = assinatura.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([caseId, lawyerId])
+  @@index([lawyerId, status])
+  @@map("case_assignments")
+}
+
+model KanbanStage {
+  id          String           @id @default(uuid())
+  lawyerId    String
+  lawyer      Lawyer           @relation(fields: [lawyerId], references: [id])
+  name        String // Triagem, Petição, Audiência…
+  order       Int
+  color       String?
+  assignments CaseAssignment[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([lawyerId, order])
+  @@map("kanban_stages")
+}
+
+// ----------------------- DOCUMENTOS -----------------------
+model Document {
+  id           String  @id @default(uuid())
+  caseId       String?
+  case         Case?   @relation(fields: [caseId], references: [id])
+  uploadedById String
+  uploadedBy   User    @relation(fields: [uploadedById], references: [id])
+
+  storageBucket String // guardamos referência, não o binário
+  storageKey    String // caminho no Supabase Storage
+  fileName      String
+  mimeType      String
+  sizeBytes     Int
+  checksum      String? // integridade
+  isEncrypted   Boolean @default(true)
+  encryptionAlg String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([caseId])
+  @@map("documents")
+}
+
+// ----------------------- IA -----------------------
+model AiMessage {
+  id     String @id @default(uuid())
+  caseId String
+  case   Case   @relation(fields: [caseId], references: [id])
+  userId String?
+  user   User?  @relation(fields: [userId], references: [id])
+
+  role    AiMessageRole
+  content String
+  context AiContext     @default(CITIZEN_TRIAGE)
+
+  provider         String? // anthropic | openai | google
+  model            String?
+  promptTokens     Int?
+  completionTokens Int?
+  piiRedacted      Boolean @default(false) // PII pseudonimizada antes do LLM
+
+  createdAt DateTime @default(now())
+
+  @@index([caseId, createdAt])
+  @@map("ai_messages")
+}
+
+model GeneratedDocument {
+  id                 String  @id @default(uuid())
+  caseId             String
+  case               Case    @relation(fields: [caseId], references: [id])
+  authoredByLawyerId String?
+  authoredBy         Lawyer? @relation(fields: [authoredByLawyerId], references: [id])
+
+  type              GeneratedDocType
+  title             String
+  content           String // minuta/peça (rich text/markdown)
+  version           Int              @default(1)
+  isAiAssisted      Boolean          @default(true)
+  aiDisclaimerShown Boolean          @default(true) // aviso de limitação da IA
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([caseId])
+  @@map("generated_documents")
+}
+
+// ----------------------- PROCESSOS (Datajud/CNJ) -----------------------
+model ProcessMonitoring {
+  id        String  @id @default(uuid())
+  caseId    String?
+  case      Case?   @relation(fields: [caseId], references: [id])
+  citizenId String?
+  citizen   User?   @relation(fields: [citizenId], references: [id])
+  lawyerId  String?
+  lawyer    Lawyer? @relation(fields: [lawyerId], references: [id])
+
+  processNumber String // número CNJ
+  court         String? // tribunal
+  className     String?
+  subject       String?
+  active        Boolean   @default(true)
+  lastSyncedAt  DateTime?
+
+  movements ProcessMovement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([processNumber, lawyerId])
+  @@index([citizenId])
+  @@map("process_monitorings")
+}
+
+model ProcessMovement {
+  id           String            @id @default(uuid())
+  monitoringId String
+  monitoring   ProcessMonitoring @relation(fields: [monitoringId], references: [id])
+
+  cnjCode        String? // código de movimento CNJ
+  rawText        String // texto oficial
+  simplifiedText String? // tradução p/ linguagem simples (IA)
+  occurredAt     DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([monitoringId, occurredAt])
+  @@map("process_movements")
+}
+
+// ----------------------- BILLING (SaaS advogado) -----------------------
+model Subscription {
+  id                    String             @id @default(uuid())
+  lawyerUserId          String
+  lawyerUser            User               @relation(fields: [lawyerUserId], references: [id])
+  planCode              String // STARTER, PRO… (por área/volumetria)
+  status                SubscriptionStatus @default(TRIALING)
+  gateway               String? // stripe | asaas | …
+  gatewaySubscriptionId String?
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  canceledAt            DateTime?
+
+  payments Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([lawyerUserId, status])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  payerUserId    String
+  payerUser      User          @relation(fields: [payerUserId], references: [id])
+
+  amount           Decimal       @db.Decimal(12, 2)
+  currency         String        @default("BRL")
+  method           PaymentMethod
+  status           PaymentStatus @default(PENDING)
+  gateway          String?
+  gatewayPaymentId String?
+  paidAt           DateTime?
+  // OAB: pagamento = ASSINATURA SaaS, nunca honorário/comissão por caso.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([payerUserId, status])
+  @@map("payments")
+}
+
+// ----------------------- CONSENTIMENTO (LGPD) -----------------------
+model ConsentTerm {
+  id          String          @id @default(uuid())
+  type        ConsentTermType
+  version     String // ex.: "1.0.0"
+  title       String
+  content     String // texto integral
+  effectiveAt DateTime
+  isCurrent   Boolean         @default(true)
+
+  consents UserConsent[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([type, version])
+  @@index([type, isCurrent])
+  @@map("consent_terms")
+}
+
+model UserConsent {
+  id        String      @id @default(uuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  termId    String
+  term      ConsentTerm @relation(fields: [termId], references: [id])
+  granted   Boolean     @default(true)
+  grantedAt DateTime    @default(now())
+  revokedAt DateTime?
+  ipAddress String?
+  userAgent String?
+
+  @@unique([userId, termId])
+  @@index([userId])
+  @@map("user_consents")
+}
+
+// ----------------------- AVALIAÇÕES -----------------------
+model Review {
+  id            String  @id @default(uuid())
+  caseId        String
+  case          Case    @relation(fields: [caseId], references: [id])
+  authorId      String
+  author        User    @relation(fields: [authorId], references: [id])
+  lawyerId      String?
+  lawyer        Lawyer? @relation(fields: [lawyerId], references: [id])
+  serviceRating Int // 1–5 (serviço/plataforma)
+  lawyerRating  Int? // 1–5 (profissional)
+  comment       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([caseId, authorId])
+  @@map("reviews")
+}
+
+// ----------------------- AUDITORIA & BACKOFFICE -----------------------
+model AuditLog {
+  id         String    @id @default(uuid())
+  actorId    String? // null = sistema
+  actor      User?     @relation(fields: [actorId], references: [id])
+  actorRole  UserRole?
+  action     String // ACCEPT_CASE, UPLOAD_DOC, VIEW_DOC…
+  entityType String // Case, Document, Subscription…
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime  @default(now()) // sem updatedAt: registro imutável
+
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model AdminNote {
+  id            String  @id @default(uuid())
+  authorAdminId String
+  authorAdmin   User    @relation("AdminNoteAuthor", fields: [authorAdminId], references: [id])
+  aboutUserId   String?
+  aboutUser     User?   @relation("NotesAboutUser", fields: [aboutUserId], references: [id])
+  aboutCaseId   String?
+  aboutCase     Case?   @relation("NotesAboutCase", fields: [aboutCaseId], references: [id])
+  note          String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("admin_notes")
+}

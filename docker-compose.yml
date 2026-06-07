@@ -1,0 +1,23 @@
+# Infra local de desenvolvimento.
+# Postgres com a extensão pgvector já incluída (para o RAG do ai-core).
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: legaltech_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

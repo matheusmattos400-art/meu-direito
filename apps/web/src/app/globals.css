@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tokens de design "Quiet Luxury" (compartilhados em @app/ui/src/styles/tokens.css). */
+:root {
+  --font-sans: 'Inter';
+  --font-serif: 'Newsreader';
+
+  --background: 40 33% 98%;
+  --foreground: 24 10% 12%;
+  --card: 40 33% 99%;
+  --card-foreground: 24 10% 12%;
+  --muted: 36 16% 94%;
+  --muted-foreground: 28 6% 42%;
+  --primary: 24 10% 12%;
+  --primary-foreground: 40 33% 98%;
+  --accent: 36 28% 46%;
+  --accent-foreground: 40 33% 98%;
+  --border: 30 12% 88%;
+  --input: 30 12% 88%;
+  --ring: 24 10% 30%;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 24 10% 8%;
+  --foreground: 40 20% 92%;
+  --card: 24 10% 10%;
+  --card-foreground: 40 20% 92%;
+  --muted: 24 8% 16%;
+  --muted-foreground: 30 8% 64%;
+  --primary: 40 20% 92%;
+  --primary-foreground: 24 10% 10%;
+  --accent: 36 26% 56%;
+  --accent-foreground: 24 10% 10%;
+  --border: 24 8% 20%;
+  --input: 24 8% 20%;
+  --ring: 40 20% 70%;
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}

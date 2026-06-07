@@ -1,0 +1,51 @@
+/**
+ * Tokens de design — "Quiet Luxury".
+ * Paleta neutra e quente, baixa saturação, um único acento discreto (latão).
+ * Importe este arquivo no globals.css do app.
+ */
+:root {
+  --font-sans: 'Inter';
+  --font-serif: 'Newsreader';
+
+  --background: 40 33% 98%; /* papel quente */
+  --foreground: 24 10% 12%; /* tinta */
+
+  --card: 40 33% 99%;
+  --card-foreground: 24 10% 12%;
+
+  --muted: 36 16% 94%;
+  --muted-foreground: 28 6% 42%;
+
+  --primary: 24 10% 12%; /* quase preto */
+  --primary-foreground: 40 33% 98%;
+
+  --accent: 36 28% 46%; /* latão discreto */
+  --accent-foreground: 40 33% 98%;
+
+  --border: 30 12% 88%;
+  --input: 30 12% 88%;
+  --ring: 24 10% 30%;
+
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 24 10% 8%;
+  --foreground: 40 20% 92%;
+
+  --card: 24 10% 10%;
+  --card-foreground: 40 20% 92%;
+
+  --muted: 24 8% 16%;
+  --muted-foreground: 30 8% 64%;
+
+  --primary: 40 20% 92%;
+  --primary-foreground: 24 10% 10%;
+
+  --accent: 36 26% 56%;
+  --accent-foreground: 24 10% 10%;
+
+  --border: 24 8% 20%;
+  --input: 24 8% 20%;
+  --ring: 40 20% 70%;
+}
