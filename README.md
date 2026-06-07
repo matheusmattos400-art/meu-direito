@@ -30,6 +30,8 @@ docs/        architecture · compliance · api · runbooks
 
 ## Como rodar (desenvolvimento)
 
+> Guia completo (Supabase ou Docker, passo a passo): [`docs/runbooks/RUNNING.md`](docs/runbooks/RUNNING.md).
+
 Pré-requisitos: **Node >= 20**, **Docker** e **pnpm** (via corepack).
 
 ```bash
