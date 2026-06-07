@@ -10,6 +10,7 @@ import { StorageModule } from './common/storage/storage.module';
 import { DatajudModule } from './common/datajud/datajud.module';
 import { SupabaseAuthGuard } from './common/auth/supabase-auth.guard';
 import { RolesGuard } from './common/auth/roles.guard';
+import { ScopesGuard } from './common/auth/scopes.guard';
 import { IdentityModule } from './modules/identity/identity.module';
 import { CasosModule } from './modules/casos/casos.module';
 import { OportunidadesModule } from './modules/oportunidades/oportunidades.module';
@@ -22,6 +23,7 @@ import { ProcessosModule } from './modules/processos/processos.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
+import { SupportModule } from './modules/support/support.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -50,6 +52,7 @@ import { HealthController } from './health.controller';
     BillingModule,
     KnowledgeModule,
     CatalogModule,
+    SupportModule,
   ],
   controllers: [HealthController],
   providers: [
@@ -57,6 +60,7 @@ import { HealthController } from './health.controller';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: SupabaseAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: ScopesGuard },
   ],
 })
 export class AppModule {}

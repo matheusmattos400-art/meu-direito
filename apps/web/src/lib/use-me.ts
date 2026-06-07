@@ -9,6 +9,8 @@ export interface Me {
   status: string;
   email: string | null;
   fullName: string | null;
+  isOwner: boolean;
+  adminScopes: string[];
 }
 
 export interface UseMe {

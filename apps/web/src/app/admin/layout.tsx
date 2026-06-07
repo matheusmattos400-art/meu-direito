@@ -6,12 +6,12 @@ import { useEffect, useState } from 'react';
 import { Spinner } from '@app/ui';
 import { useMe } from '@/lib/use-me';
 
-const NAV = [
-  { href: '/admin', label: 'Painel', icon: 'M3 12l9-9 9 9M5 10v10h14V10' },
-  { href: '/admin/advogados', label: 'Advogados', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM4 21v-1a6 6 0 0112 0v1' },
-  { href: '/admin/financeiro', label: 'Financeiro', icon: 'M3 7h18v10H3zM3 11h18M7 15h3' },
-  { href: '/admin/usuarios', label: 'Usuários', icon: 'M12 12a5 5 0 100-10 5 5 0 000 10zM3 21a9 9 0 0118 0' },
-  { href: '/admin/conhecimento', label: 'Conhecimento', icon: 'M4 5a2 2 0 012-2h12v18H6a2 2 0 01-2-2V5zM8 7h8M8 11h8' },
+const NAV: Array<{ href: string; label: string; icon: string; scope: string | null }> = [
+  { href: '/admin', label: 'Painel', icon: 'M3 12l9-9 9 9M5 10v10h14V10', scope: null },
+  { href: '/admin/advogados', label: 'Advogados', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM4 21v-1a6 6 0 0112 0v1', scope: 'ADVOGADOS' },
+  { href: '/admin/financeiro', label: 'Financeiro', icon: 'M3 7h18v10H3zM3 11h18M7 15h3', scope: 'FINANCEIRO' },
+  { href: '/admin/suporte', label: 'Suporte', icon: 'M21 11.5a8.38 8.38 0 01-8.5 8.5 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 0117 0z', scope: 'SUPORTE' },
+  { href: '/admin/usuarios', label: 'Usuários', icon: 'M12 12a5 5 0 100-10 5 5 0 000 10zM3 21a9 9 0 0118 0', scope: 'USUARIOS' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -49,6 +49,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
+  const can = (scope: string | null) => !scope || me.isOwner || me.adminScopes.includes(scope);
+  const nav = NAV.filter((i) => can(i.scope));
+
   return (
     <div className="flex min-h-screen">
       <aside
@@ -77,7 +80,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         <nav className="flex flex-col gap-1">
-          {NAV.map((item) => {
+          {nav.map((item) => {
             const active = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
             return (
               <Link
@@ -106,7 +109,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <header className="flex items-center gap-4 border-b border-border px-6 py-4 md:hidden">
           <span className="font-serif text-lg tracking-tightish">Meu Direito</span>
           <nav className="ml-auto flex gap-4 text-sm text-muted-foreground">
-            {NAV.map((i) => (
+            {nav.map((i) => (
               <Link key={i.href} href={i.href} className="hover:text-foreground">
                 {i.label}
               </Link>

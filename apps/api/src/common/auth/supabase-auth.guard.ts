@@ -73,11 +73,11 @@ export class SupabaseAuthGuard implements CanActivate {
       create: { authUserId, email: email ?? null, role: isAdmin ? 'ADMIN' : 'CITIZEN' },
     });
 
-    // Promove a ADMIN se o e-mail estiver na allowlist e ainda não for admin.
-    if (isAdmin && user.role !== 'ADMIN') {
+    // Promove a ADMIN/owner se o e-mail estiver na allowlist.
+    if (isAdmin && (user.role !== 'ADMIN' || !user.isOwner)) {
       user = await this.prisma.user.update({
         where: { id: user.id },
-        data: { role: 'ADMIN' },
+        data: { role: 'ADMIN', isOwner: true },
       });
     }
 
@@ -108,8 +108,8 @@ export class SupabaseAuthGuard implements CanActivate {
 
     const user = await this.prisma.user.upsert({
       where: { email: devEmail },
-      update: { role },
-      create: { email: devEmail, role },
+      update: { role, ...(isAdmin ? { isOwner: true } : {}) },
+      create: { email: devEmail, role, isOwner: isAdmin },
     });
 
     request.authUser = { id: user.authUserId ?? user.id, email: devEmail };

@@ -157,6 +157,11 @@ model User {
   city       String? // localização minimizada (LGPD)
   state      String?    @db.Char(2)
 
+  // Backoffice: dono + escopos de acesso (abas) + senha provisória do admin
+  isOwner             Boolean  @default(false)
+  adminScopes         String[] @default([])
+  provisionalPassword String?
+
   lawyer             Lawyer?
   cases              Case[]
   aiMessages         AiMessage[]
@@ -169,6 +174,9 @@ model User {
   processes          ProcessMonitoring[]
   adminNotesAuthored AdminNote[]         @relation("AdminNoteAuthor")
   adminNotesAbout    AdminNote[]         @relation("NotesAboutUser")
+  ticketsRequested   SupportTicket[]     @relation("TicketRequester")
+  ticketsAssigned    SupportTicket[]     @relation("TicketAssignee")
+  supportMessages    SupportMessage[]
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -623,6 +631,48 @@ model AdminNote {
   updatedAt     DateTime @updatedAt
 
   @@map("admin_notes")
+}
+
+// ----------------------- SUPORTE (helpdesk / chamados) -----------------------
+enum SupportStatus {
+  OPEN // não resolvido / aguardando
+  IN_PROGRESS // em andamento
+  RESOLVED // resolvido
+}
+
+model SupportTicket {
+  id            String        @id @default(uuid())
+  requesterId   String
+  requester     User          @relation("TicketRequester", fields: [requesterId], references: [id])
+  requesterRole UserRole // snapshot: LAWYER ou CITIZEN (público)
+  subject       String
+  status        SupportStatus @default(OPEN)
+  assignedAdminId String?
+  assignedAdmin   User?       @relation("TicketAssignee", fields: [assignedAdminId], references: [id])
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastMessageAt DateTime @default(now())
+
+  messages SupportMessage[]
+
+  @@index([status, lastMessageAt])
+  @@index([requesterId])
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id         String        @id @default(uuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User          @relation(fields: [authorId], references: [id])
+  authorRole UserRole
+  body       String
+  createdAt  DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
+  @@map("support_messages")
 }
 
 // ----------------------- BASE DE CONHECIMENTO (RAG) -----------------------

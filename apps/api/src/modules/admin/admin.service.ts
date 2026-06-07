@@ -1,6 +1,11 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { User } from '@app/db';
-import type { AdminCreateLawyerInput, CreatePlanInput, RejectLawyerInput } from '@app/validation';
+import type {
+  AdminCreateLawyerInput,
+  CreateAdminInput,
+  CreatePlanInput,
+  RejectLawyerInput,
+} from '@app/validation';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { StorageService } from '../../common/storage/storage.service';
@@ -421,8 +426,107 @@ export class AdminService {
       status: u.status,
       email: u.email,
       fullName: u.fullName,
+      isOwner: u.isOwner,
+      adminScopes: u.adminScopes,
       createdAt: u.createdAt,
     }));
+  }
+
+  /** Lista apenas administradores (com escopos) — para a tela de gestão. */
+  async listAdmins() {
+    const admins = await this.prisma.user.findMany({
+      where: { role: 'ADMIN' },
+      orderBy: [{ isOwner: 'desc' }, { createdAt: 'asc' }],
+    });
+    return admins.map((u) => ({
+      id: u.id,
+      email: u.email,
+      fullName: u.fullName,
+      isOwner: u.isOwner,
+      scopes: u.adminScopes,
+      provisionalPassword: u.provisionalPassword,
+      createdAt: u.createdAt,
+    }));
+  }
+
+  /** Cria um administrador com login/senha e escopos (somente o dono). */
+  async createAdmin(owner: User, dto: CreateAdminInput) {
+    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    if (existing?.role === 'ADMIN') {
+      throw new ConflictException('Este e-mail já é de um administrador.');
+    }
+    const user = existing
+      ? await this.prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            role: 'ADMIN',
+            fullName: dto.fullName,
+            adminScopes: dto.scopes,
+            provisionalPassword: dto.password,
+            status: 'ACTIVE',
+          },
+        })
+      : await this.prisma.user.create({
+          data: {
+            email: dto.email,
+            fullName: dto.fullName,
+            role: 'ADMIN',
+            adminScopes: dto.scopes,
+            provisionalPassword: dto.password,
+            status: 'ACTIVE',
+          },
+        });
+    await this.audit.log({
+      actorId: owner.id,
+      actorRole: 'ADMIN',
+      action: 'ADMIN_CREATE',
+      entityType: 'User',
+      entityId: user.id,
+      metadata: { email: dto.email, scopes: dto.scopes },
+    });
+    return { userId: user.id, email: dto.email };
+  }
+
+  /** Remove o acesso de administrador (somente o dono). */
+  async removeAdmin(owner: User, userId: string) {
+    if (owner.id === userId) {
+      throw new BadRequestException('Você não pode remover a si mesmo.');
+    }
+    const u = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!u) throw new NotFoundException('Usuário não encontrado.');
+    if (u.isOwner) throw new BadRequestException('Não é possível remover o proprietário.');
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { role: 'CITIZEN', adminScopes: [], provisionalPassword: null },
+    });
+    await this.audit.log({
+      actorId: owner.id,
+      actorRole: 'ADMIN',
+      action: 'ADMIN_REMOVE',
+      entityType: 'User',
+      entityId: userId,
+    });
+    return { userId, removed: true };
+  }
+
+  /** Define os escopos de acesso de um administrador (somente o dono). */
+  async setAdminScopes(owner: User, userId: string, scopes: string[]) {
+    const u = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!u) throw new NotFoundException('Usuário não encontrado.');
+    if (u.isOwner) throw new BadRequestException('O proprietário tem acesso total.');
+    if (u.role !== 'ADMIN') throw new BadRequestException('Usuário não é administrador.');
+
+    await this.prisma.user.update({ where: { id: userId }, data: { adminScopes: scopes } });
+    await this.audit.log({
+      actorId: owner.id,
+      actorRole: 'ADMIN',
+      action: 'ADMIN_SET_SCOPES',
+      entityType: 'User',
+      entityId: userId,
+      metadata: { scopes },
+    });
+    return { userId, scopes };
   }
 
   /** Promove um usuário a ADMIN (acesso interno; não exige OAB). */

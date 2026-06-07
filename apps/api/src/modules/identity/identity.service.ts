@@ -18,6 +18,8 @@ export interface UserProfile {
   status: User['status'];
   email: string | null;
   fullName: string | null;
+  isOwner: boolean;
+  adminScopes: string[];
 }
 
 @Injectable()
@@ -36,6 +38,8 @@ export class IdentityService {
       status: user.status,
       email: user.email,
       fullName: user.fullName,
+      isOwner: user.isOwner,
+      adminScopes: user.adminScopes,
     };
   }
 

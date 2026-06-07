@@ -24,6 +24,9 @@ export default function AdvogadoLayout({ children }: { children: React.ReactNode
             <Link href="/advogado/verificacao" className="hover:text-foreground">
               Verificação
             </Link>
+            <Link href="/suporte" className="hover:text-foreground">
+              Suporte
+            </Link>
           </nav>
         </div>
       </header>

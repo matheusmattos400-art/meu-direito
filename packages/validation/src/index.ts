@@ -88,6 +88,44 @@ export const moveKanbanCardSchema = z.object({
 });
 export type MoveKanbanCardInput = z.infer<typeof moveKanbanCardSchema>;
 
+/** Escopos de acesso do administrador (abas do backoffice). */
+export const adminScopeSchema = z.enum(['ADVOGADOS', 'FINANCEIRO', 'USUARIOS', 'SUPORTE']);
+export type AdminScopeInput = z.infer<typeof adminScopeSchema>;
+
+/** Criação de um administrador (somente o dono). */
+export const createAdminSchema = z.object({
+  fullName: z.string().min(3, 'Informe o nome.').max(200),
+  email: z.string().email('E-mail inválido.'),
+  password: z.string().min(6, 'A senha deve ter ao menos 6 caracteres.').max(100),
+  scopes: z.array(adminScopeSchema).default([]),
+});
+export type CreateAdminInput = z.infer<typeof createAdminSchema>;
+
+/** Atualização dos escopos de um administrador. */
+export const setAdminScopesSchema = z.object({
+  scopes: z.array(adminScopeSchema),
+});
+export type SetAdminScopesInput = z.infer<typeof setAdminScopesSchema>;
+
+/** Abertura de um chamado de suporte. */
+export const openTicketSchema = z.object({
+  subject: z.string().min(3, 'Descreva o assunto.').max(160),
+  message: z.string().min(1, 'Escreva sua mensagem.').max(5000),
+});
+export type OpenTicketInput = z.infer<typeof openTicketSchema>;
+
+/** Mensagem em um chamado de suporte. */
+export const ticketMessageSchema = z.object({
+  body: z.string().min(1, 'Mensagem vazia.').max(5000),
+});
+export type TicketMessageInput = z.infer<typeof ticketMessageSchema>;
+
+/** Atualização de status de um chamado (admin). */
+export const updateTicketSchema = z.object({
+  status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED']),
+});
+export type UpdateTicketInput = z.infer<typeof updateTicketSchema>;
+
 /** Criação de um plano SaaS (backoffice). */
 export const createPlanSchema = z.object({
   code: z

@@ -43,9 +43,14 @@ export default function MeusCasosPage() {
     <main className="mx-auto min-h-screen max-w-2xl px-6 py-16">
       <div className="mb-8 flex items-center justify-between">
         <h1 className="font-serif text-3xl tracking-tightish">Meus Casos</h1>
-        <Link href="/triagem">
-          <Button size="sm">Novo caso</Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/suporte">
+            <Button size="sm" variant="outline">Suporte</Button>
+          </Link>
+          <Link href="/triagem">
+            <Button size="sm">Novo caso</Button>
+          </Link>
+        </div>
       </div>
 
       {loading ? (
