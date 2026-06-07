@@ -14,16 +14,22 @@ import { AdminService } from './admin.service';
 export class AdminController {
   constructor(private readonly admin: AdminService) {}
 
-  @Get('lawyers/pending')
-  @ApiOperation({ summary: 'Lista advogados aguardando validação de OAB.' })
-  pendingLawyers() {
-    return this.admin.listPendingLawyers().then((data) => ({ data }));
+  @Get('lawyers')
+  @ApiOperation({ summary: 'Lista os advogados (status, estado, nº de processos).' })
+  lawyers() {
+    return this.admin.listLawyers().then((data) => ({ data }));
   }
 
-  @Post('lawyers/:lawyerId/verify')
-  @ApiOperation({ summary: 'Valida a OAB de um advogado.' })
-  verify(@CurrentUser() user: User, @Param('lawyerId', ParseUUIDPipe) lawyerId: string) {
-    return this.admin.verifyLawyer(user, lawyerId).then((data) => ({ data }));
+  @Get('lawyers/:lawyerId')
+  @ApiOperation({ summary: 'Ficha completa do advogado (formulário + documentos).' })
+  lawyerDetail(@Param('lawyerId', ParseUUIDPipe) lawyerId: string) {
+    return this.admin.getLawyerDetail(lawyerId).then((data) => ({ data }));
+  }
+
+  @Post('lawyers/:lawyerId/activate')
+  @ApiOperation({ summary: 'Ativa a conta do advogado (cadastro aprovado).' })
+  activate(@CurrentUser() user: User, @Param('lawyerId', ParseUUIDPipe) lawyerId: string) {
+    return this.admin.activateLawyer(user, lawyerId).then((data) => ({ data }));
   }
 
   @Post('lawyers/:lawyerId/reject')
@@ -34,6 +40,12 @@ export class AdminController {
     @Body(new ZodValidationPipe(rejectLawyerSchema)) dto: RejectLawyerInput,
   ) {
     return this.admin.rejectLawyer(user, lawyerId, dto).then((data) => ({ data }));
+  }
+
+  @Post('lawyers/:lawyerId/cancel')
+  @ApiOperation({ summary: 'Cancela a conta do advogado.' })
+  cancel(@CurrentUser() user: User, @Param('lawyerId', ParseUUIDPipe) lawyerId: string) {
+    return this.admin.cancelLawyer(user, lawyerId).then((data) => ({ data }));
   }
 
   @Get('users')

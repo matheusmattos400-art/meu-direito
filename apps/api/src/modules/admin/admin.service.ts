@@ -13,76 +13,114 @@ export class AdminService {
     private readonly storage: StorageService,
   ) {}
 
-  // ---------------- Validação de OAB ----------------
-  async listPendingLawyers() {
+  // ---------------- Advogados (ciclo de conta) ----------------
+  /** Lista todos os advogados com dados de cartão: nome, área, nº processos, status, estado. */
+  async listLawyers() {
     const lawyers = await this.prisma.lawyer.findMany({
-      where: { verification: 'PENDING' },
       include: {
         user: true,
         specialties: { include: { category: true } },
-        verificationDocuments: { where: { deletedAt: null } },
+        _count: { select: { monitorings: true } },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
     });
-    return Promise.all(
-      lawyers.map(async (l) => ({
-        lawyerId: l.id,
-        name: l.user.fullName,
-        email: l.user.email,
-        oab: `${l.oabNumber}/${l.oabState}`,
-        specialties: l.specialties.map((s) => s.category.name),
-        documents: await Promise.all(
-          l.verificationDocuments.map(async (d) => ({
-            id: d.id,
-            fileName: d.fileName,
-            downloadUrl: await this.storage.createDownloadUrl(d.storageKey),
-          })),
-        ),
-        createdAt: l.createdAt,
-      })),
-    );
+    return lawyers.map((l) => ({
+      lawyerId: l.id,
+      name: l.user.fullName,
+      email: l.user.email,
+      oab: `${l.oabNumber}/${l.oabState}`,
+      state: l.oabState,
+      specialties: l.specialties.map((s) => s.category.name),
+      processCount: l._count.monitorings,
+      status: l.status,
+      submittedAt: l.submittedAt,
+    }));
   }
 
-  async verifyLawyer(admin: User, lawyerId: string) {
+  /** Ficha completa do advogado (formulário + documentos com download). */
+  async getLawyerDetail(lawyerId: string) {
+    const l = await this.prisma.lawyer.findUnique({
+      where: { id: lawyerId },
+      include: {
+        user: true,
+        specialties: { include: { category: true } },
+        verificationDocuments: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
+      },
+    });
+    if (!l) throw new NotFoundException('Advogado não encontrado.');
+
+    return {
+      lawyerId: l.id,
+      status: l.status,
+      profile: {
+        fullName: l.user.fullName,
+        cpf: l.cpf,
+        email: l.user.email,
+        phone: l.phone,
+        phone2: l.phone2,
+        birthDate: l.birthDate,
+        oab: `${l.oabNumber}/${l.oabState}`,
+        residentialAddress: l.residentialAddress,
+        professionalAddress: l.professionalAddress,
+        specialties: l.specialties.map((s) => s.category.name),
+      },
+      term: { accepted: l.termAccepted, acceptedAt: l.termAcceptedAt },
+      submittedAt: l.submittedAt,
+      documents: await Promise.all(
+        l.verificationDocuments.map(async (d) => ({
+          id: d.id,
+          kind: d.kind,
+          fileName: d.fileName,
+          downloadUrl: await this.storage.createDownloadUrl(d.storageKey),
+        })),
+      ),
+    };
+  }
+
+  private async setLawyerStatus(
+    admin: User,
+    lawyerId: string,
+    status: 'ACTIVE' | 'REJECTED' | 'CANCELED',
+    action: string,
+    meta?: Record<string, unknown>,
+  ) {
     const lawyer = await this.prisma.lawyer.findUnique({ where: { id: lawyerId } });
     if (!lawyer) throw new NotFoundException('Advogado não encontrado.');
 
     await this.prisma.$transaction([
       this.prisma.lawyer.update({
         where: { id: lawyerId },
-        data: { verification: 'VERIFIED', verifiedAt: new Date() },
+        data: { status, decidedAt: new Date() },
       }),
-      this.prisma.user.update({ where: { id: lawyer.userId }, data: { status: 'ACTIVE' } }),
+      this.prisma.user.update({
+        where: { id: lawyer.userId },
+        data: { status: status === 'ACTIVE' ? 'ACTIVE' : 'SUSPENDED' },
+      }),
     ]);
 
     await this.audit.log({
       actorId: admin.id,
       actorRole: 'ADMIN',
-      action: 'OAB_VERIFY',
+      action,
       entityType: 'Lawyer',
       entityId: lawyerId,
+      metadata: meta,
     });
-    return { lawyerId, verification: 'VERIFIED' };
+    return { lawyerId, status };
   }
 
-  async rejectLawyer(admin: User, lawyerId: string, dto: RejectLawyerInput) {
-    const lawyer = await this.prisma.lawyer.findUnique({ where: { id: lawyerId } });
-    if (!lawyer) throw new NotFoundException('Advogado não encontrado.');
+  activateLawyer(admin: User, lawyerId: string) {
+    return this.setLawyerStatus(admin, lawyerId, 'ACTIVE', 'LAWYER_ACTIVATE');
+  }
 
-    await this.prisma.lawyer.update({
-      where: { id: lawyerId },
-      data: { verification: 'REJECTED' },
+  rejectLawyer(admin: User, lawyerId: string, dto: RejectLawyerInput) {
+    return this.setLawyerStatus(admin, lawyerId, 'REJECTED', 'LAWYER_REJECT', {
+      reason: dto.reason,
     });
+  }
 
-    await this.audit.log({
-      actorId: admin.id,
-      actorRole: 'ADMIN',
-      action: 'OAB_REJECT',
-      entityType: 'Lawyer',
-      entityId: lawyerId,
-      metadata: { reason: dto.reason },
-    });
-    return { lawyerId, verification: 'REJECTED' };
+  cancelLawyer(admin: User, lawyerId: string) {
+    return this.setLawyerStatus(admin, lawyerId, 'CANCELED', 'LAWYER_CANCEL');
   }
 
   // ---------------- Usuários / auditoria ----------------

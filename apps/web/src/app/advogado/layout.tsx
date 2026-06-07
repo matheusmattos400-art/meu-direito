@@ -9,6 +9,9 @@ export default function AdvogadoLayout({ children }: { children: React.ReactNode
             Workspace
           </Link>
           <nav className="flex items-center gap-6 text-sm text-muted-foreground">
+            <Link href="/advogado/cadastro" className="hover:text-foreground">
+              Cadastro
+            </Link>
             <Link href="/advogado/oportunidades" className="hover:text-foreground">
               Oportunidades
             </Link>

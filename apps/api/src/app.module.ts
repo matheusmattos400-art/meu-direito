@@ -21,6 +21,7 @@ import { PecasModule } from './modules/pecas/pecas.module';
 import { ProcessosModule } from './modules/processos/processos.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -48,6 +49,7 @@ import { HealthController } from './health.controller';
     ProcessosModule,
     BillingModule,
     KnowledgeModule,
+    CatalogModule,
   ],
   controllers: [HealthController],
   providers: [

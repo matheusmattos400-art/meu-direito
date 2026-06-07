@@ -15,12 +15,12 @@ export class LawyerContextService {
     return lawyer;
   }
 
-  /** Exige advogado com OAB verificada (ética/segurança). */
+  /** Exige advogado com conta ATIVA (cadastro aprovado pelo backoffice). */
   async resolveVerified(user: User): Promise<Lawyer> {
     const lawyer = await this.resolve(user);
-    if (lawyer.verification !== 'VERIFIED') {
+    if (lawyer.status !== 'ACTIVE') {
       throw new ForbiddenException(
-        'Seu cadastro de advogado ainda está em verificação. Aguarde a validação da OAB.',
+        'Seu cadastro ainda não está ativo. Conclua o envio de documentos e aguarde a análise.',
       );
     }
     return lawyer;

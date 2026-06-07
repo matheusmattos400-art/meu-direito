@@ -1,28 +1,21 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Spinner,
-} from '@app/ui';
+import Link from 'next/link';
+import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
 import { getSupabaseBrowser } from '@/lib/supabase';
+import { LAWYER_STATUS_META, type LawyerStatus } from '@/lib/lawyer-status';
 
-interface LawyerProfile {
-  id: string;
-  oab: string;
-  verification: 'PENDING' | 'VERIFIED' | 'REJECTED';
-  verifiedAt: string | null;
+interface Profile {
+  status: LawyerStatus;
+  termAccepted: boolean;
+  submittedAt: string | null;
 }
 interface VDoc {
   id: string;
+  kind: string | null;
   fileName: string;
-  downloadUrl: string;
 }
 interface SignedUpload {
   bucket: string;
@@ -30,54 +23,55 @@ interface SignedUpload {
   token: string;
 }
 
-const STATUS: Record<string, { label: string; tone: string }> = {
-  PENDING: { label: 'Em análise', tone: 'text-muted-foreground' },
-  VERIFIED: { label: 'Verificado', tone: 'text-foreground' },
-  REJECTED: { label: 'Rejeitado', tone: 'text-accent' },
-};
+const KINDS: Array<{ kind: 'IDENTITY' | 'OAB' | 'RESIDENCE'; label: string }> = [
+  { kind: 'IDENTITY', label: 'Documento de identidade (RG/CNH)' },
+  { kind: 'OAB', label: 'Carteira da OAB' },
+  { kind: 'RESIDENCE', label: 'Comprovante de residência' },
+];
 
 export default function VerificacaoPage() {
-  const [profile, setProfile] = useState<LawyerProfile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [noProfile, setNoProfile] = useState(false);
   const [docs, setDocs] = useState<VDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [term, setTerm] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
 
   async function refresh() {
     const [p, d] = await Promise.all([
-      apiFetch<LawyerProfile>('/lawyers/me'),
+      apiFetch<Profile>('/lawyers/me'),
       apiFetch<VDoc[]>('/lawyers/verification-documents'),
     ]);
     setProfile(p);
+    setTerm(p.termAccepted);
     setDocs(d);
   }
 
   useEffect(() => {
     refresh()
-      .catch((err) => setError(err instanceof Error ? err.message : 'Erro ao carregar.'))
+      .catch((err) => {
+        if (err instanceof Error && /advogado não encontrado/i.test(err.message)) setNoProfile(true);
+        else setError(err instanceof Error ? err.message : 'Erro ao carregar.');
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function upload(kind: string, file: File) {
     setBusy(true);
     setError(null);
     try {
       const signed = await apiFetch<SignedUpload>('/lawyers/verification-documents/upload-url', {
         method: 'POST',
-        body: JSON.stringify({ fileName: file.name, mimeType: file.type || 'application/octet-stream' }),
+        body: JSON.stringify({ kind, fileName: file.name, mimeType: file.type || 'application/octet-stream' }),
       });
       const supabase = getSupabaseBrowser();
-      const { error: upErr } = await supabase.storage
-        .from(signed.bucket)
-        .uploadToSignedUrl(signed.path, signed.token, file);
+      const { error: upErr } = await supabase.storage.from(signed.bucket).uploadToSignedUrl(signed.path, signed.token, file);
       if (upErr) throw upErr;
-
       await apiFetch('/lawyers/verification-documents', {
         method: 'POST',
         body: JSON.stringify({
+          kind,
           storageKey: signed.path,
           fileName: file.name,
           mimeType: file.type || 'application/octet-stream',
@@ -86,65 +80,125 @@ export default function VerificacaoPage() {
       });
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro no upload.');
+      setError(err instanceof Error ? err.message : 'Erro no upload (verifique o Storage).');
     } finally {
       setBusy(false);
-      if (fileInput.current) fileInput.current.value = '';
+    }
+  }
+
+  async function acceptTerm() {
+    setBusy(true);
+    try {
+      await apiFetch('/lawyers/accept-term', { method: 'POST', body: JSON.stringify({ accepted: true }) });
+      setTerm(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao aceitar termo.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch('/lawyers/submit-for-analysis', { method: 'POST' });
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao enviar para análise.');
+    } finally {
+      setBusy(false);
     }
   }
 
   if (loading) return <Spinner className="text-muted-foreground" />;
 
+  if (noProfile) {
+    return (
+      <div className="max-w-xl">
+        <h1 className="mb-2 font-serif text-3xl tracking-tightish">Verificação</h1>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Conclua seu cadastro profissional antes de enviar os documentos.
+        </p>
+        <Link href="/advogado/cadastro">
+          <Button>Ir para o cadastro</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  const has = (k: string) => docs.some((d) => d.kind === k);
+  const allDocs = KINDS.every((k) => has(k.kind));
+  const meta = profile ? LAWYER_STATUS_META[profile.status] : null;
+  const canSubmit = allDocs && term && profile?.status !== 'IN_ANALYSIS' && profile?.status !== 'ACTIVE';
+
   return (
     <div className="max-w-2xl">
-      <h1 className="mb-2 font-serif text-3xl tracking-tightish">Verificação de OAB</h1>
-      <p className="mb-6 text-sm text-muted-foreground">
-        Envie o comprovante da sua inscrição na OAB. Nossa equipe valida os documentos antes de
-        liberar o acesso às oportunidades.
-      </p>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="font-serif text-3xl tracking-tightish">Verificação</h1>
+        {meta && <Badge variant={meta.variant} dot>{meta.label}</Badge>}
+      </div>
 
-      {profile && (
+      {profile?.status === 'IN_ANALYSIS' && (
         <Card className="mb-6">
-          <CardContent className="flex items-center justify-between py-4 text-sm">
-            <span>
-              OAB <span className="font-medium">{profile.oab}</span>
-            </span>
-            <span className={STATUS[profile.verification]?.tone}>
-              {STATUS[profile.verification]?.label ?? profile.verification}
-            </span>
+          <CardContent className="py-4 text-sm text-muted-foreground">
+            Seus documentos estão em análise. Retornaremos em até 24 horas.
           </CardContent>
         </Card>
       )}
 
-      <Card>
+      <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="text-base">Comprovantes enviados</CardTitle>
-          <CardDescription>Ex.: carteira da OAB, certidão de regularidade.</CardDescription>
+          <CardTitle className="text-base">Documentos</CardTitle>
+          <CardDescription>Envie os três documentos para liberar a análise.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <input
-            ref={fileInput}
-            type="file"
-            onChange={handleFile}
-            disabled={busy}
-            className="text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-transparent file:px-3 file:py-1.5 file:text-sm"
-          />
-          {docs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum documento enviado ainda.</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {docs.map((d) => (
-                <li key={d.id} className="rounded-md border border-border px-3 py-2 text-sm">
-                  <a href={d.downloadUrl} target="_blank" rel="noreferrer" className="hover:underline">
-                    {d.fileName}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-          {error && <p className="text-sm text-accent">{error}</p>}
+          {KINDS.map((k) => (
+            <div key={k.kind} className="flex flex-col gap-2 border-b border-border pb-4 last:border-0 last:pb-0">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">{k.label}</span>
+                {has(k.kind) ? <Badge variant="success">Enviado</Badge> : <Badge>Pendente</Badge>}
+              </div>
+              <input
+                type="file"
+                disabled={busy}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) upload(k.kind, f);
+                  e.target.value = '';
+                }}
+                className="text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-transparent file:px-3 file:py-1.5 file:text-sm"
+              />
+            </div>
+          ))}
         </CardContent>
       </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-base">Termo de responsabilidade</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {term ? (
+            <p className="text-sm text-muted-foreground">Termo aceito. ✓</p>
+          ) : (
+            <label className="flex items-start gap-3 text-sm">
+              <input type="checkbox" className="mt-1" onChange={(e) => e.target.checked && acceptTerm()} disabled={busy} />
+              <span className="text-muted-foreground">
+                Li e aceito o termo de responsabilidade profissional. (texto a ser definido)
+              </span>
+            </label>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="flex items-center gap-3">
+        <Button onClick={submit} disabled={!canSubmit || busy}>
+          {busy ? <Spinner /> : 'Enviar para análise'}
+        </Button>
+        {!allDocs && <span className="text-xs text-muted-foreground">Envie os 3 documentos.</span>}
+        {error && <p className="text-sm text-accent">{error}</p>}
+      </div>
     </div>
   );
 }

@@ -2,9 +2,11 @@ import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { User } from '@app/db';
 import {
+  acceptTermSchema,
   lawyerRegistrationSchema,
   registerVerificationDocSchema,
   verificationUploadUrlSchema,
+  type AcceptTermInput,
   type LawyerRegistrationInput,
   type RegisterVerificationDocInput,
   type VerificationUploadUrlInput,
@@ -65,8 +67,25 @@ export class IdentityController {
 
   @Get('lawyers/verification-documents')
   @Roles('LAWYER')
-  @ApiOperation({ summary: 'Lista os comprovantes de OAB do advogado atual.' })
+  @ApiOperation({ summary: 'Lista os documentos do advogado atual.' })
   listVerificationDocs(@CurrentUser() user: User) {
     return this.identity.listVerificationDocs(user).then((data) => ({ data }));
+  }
+
+  @Post('lawyers/accept-term')
+  @Roles('LAWYER')
+  @ApiOperation({ summary: 'Aceita o termo de responsabilidade.' })
+  acceptTerm(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(acceptTermSchema)) _dto: AcceptTermInput,
+  ) {
+    return this.identity.acceptTerm(user).then((data) => ({ data }));
+  }
+
+  @Post('lawyers/submit-for-analysis')
+  @Roles('LAWYER')
+  @ApiOperation({ summary: 'Envia o cadastro para análise (documentos + termo).' })
+  submitForAnalysis(@CurrentUser() user: User) {
+    return this.identity.submitForAnalysis(user).then((data) => ({ data }));
   }
 }

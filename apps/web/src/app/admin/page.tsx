@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, Spinner } from '@app/ui';
+import { Card, CardContent, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
 
 interface Stats {
@@ -28,22 +28,34 @@ export default function AdminDashboard() {
   if (error) return <p className="text-sm text-accent">{error}</p>;
   if (!stats) return null;
 
+  const totalCases = stats.casesByStatus.reduce((s, r) => s + r.count, 0);
+
   return (
-    <div className="flex flex-col gap-8">
-      <h1 className="font-serif text-3xl tracking-tightish">Painel</h1>
+    <div className="flex flex-col gap-10">
+      <header>
+        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Visão geral</p>
+        <h1 className="mt-1 font-serif text-4xl tracking-tightish">Painel</h1>
+      </header>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Metric label="Novos cadastros (30 dias)" value={String(stats.newUsers30d)} />
-        <Metric label="Taxa de conversão" value={`${stats.conversionRatePct}%`} />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric label="Novos cadastros" hint="últimos 30 dias" value={String(stats.newUsers30d)} />
+        <Metric label="Casos triados" hint="total" value={String(totalCases)} />
+        <Metric label="Taxa de conversão" hint="qualificados → atendidos" value={`${stats.conversionRatePct}%`} accent />
+        <Metric
+          label="Categorias ativas"
+          hint="com casos"
+          value={String(stats.casesByCategory.length)}
+        />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <DistributionCard title="Casos por categoria" rows={stats.casesByCategory.map((r) => ({ label: r.category, count: r.count }))} />
-        <DistributionCard title="Casos por status" rows={stats.casesByStatus.map((r) => ({ label: r.status, count: r.count }))} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Distribution title="Casos por categoria" rows={stats.casesByCategory.map((r) => ({ label: r.category, count: r.count }))} />
+        <Distribution title="Casos por status" rows={stats.casesByStatus.map((r) => ({ label: prettyStatus(r.status), count: r.count }))} />
       </div>
 
-      <DistributionCard
-        title="Casos por cidade"
+      <Distribution
+        title="Distribuição por cidade"
+        subtitle="Mapa de calor por município (granularidade minimizada — LGPD)"
         rows={stats.casesByCity.map((r) => ({
           label: `${r.city ?? '—'}${r.state ? `/${r.state}` : ''}`,
           count: r.count,
@@ -54,52 +66,86 @@ export default function AdminDashboard() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+  label,
+  hint,
+  value,
+  accent,
+}: {
+  label: string;
+  hint: string;
+  value: string;
+  accent?: boolean;
+}) {
   return (
-    <Card>
-      <CardContent className="pt-6">
+    <Card className="overflow-hidden">
+      <CardContent className="relative pt-6">
+        <div
+          className={`absolute inset-x-0 top-0 h-1 ${accent ? 'bg-accent' : 'bg-border'}`}
+          aria-hidden
+        />
         <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="mt-2 font-serif text-4xl tracking-tightish">{value}</p>
+        <p className="mt-3 font-serif text-4xl tracking-tightish tabular-nums">{value}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
       </CardContent>
     </Card>
   );
 }
 
-function DistributionCard({
+function Distribution({
   title,
+  subtitle,
   rows,
   empty,
 }: {
   title: string;
+  subtitle?: string;
   rows: Array<{ label: string; count: number }>;
   empty?: string;
 }) {
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{empty ?? 'Sem dados.'}</p>
-        ) : (
-          rows.map((r) => (
-            <div key={r.label} className="flex flex-col gap-1">
-              <div className="flex justify-between text-sm">
-                <span>{r.label}</span>
-                <span className="text-muted-foreground">{r.count}</span>
+      <CardContent className="pt-6">
+        <h3 className="font-serif text-lg tracking-tightish">{title}</h3>
+        {subtitle && <p className="mb-4 mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
+        <div className="mt-4 flex flex-col gap-3.5">
+          {rows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{empty ?? 'Sem dados.'}</p>
+          ) : (
+            rows.map((r) => (
+              <div key={r.label} className="flex flex-col gap-1.5">
+                <div className="flex items-baseline justify-between text-sm">
+                  <span>{r.label}</span>
+                  <span className="tabular-nums text-muted-foreground">{r.count}</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-accent transition-all"
+                    style={{ width: `${(r.count / max) * 100}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-1.5 w-full rounded-full bg-muted">
-                <div
-                  className="h-1.5 rounded-full bg-accent"
-                  style={{ width: `${(r.count / max) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </CardContent>
     </Card>
   );
+}
+
+function prettyStatus(s: string): string {
+  const map: Record<string, string> = {
+    SUBMITTED: 'Enviado',
+    TRIAGING: 'Em triagem',
+    TRIAGED: 'Triado',
+    RESOLVED_INFO: 'Dúvida resolvida',
+    QUALIFIED: 'Qualificado',
+    AVAILABLE: 'Disponível',
+    ASSIGNED: 'Em atendimento',
+    IN_PROGRESS: 'Em andamento',
+    CLOSED: 'Encerrado',
+    ARCHIVED: 'Arquivado',
+  };
+  return map[s] ?? s;
 }

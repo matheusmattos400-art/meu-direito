@@ -140,15 +140,17 @@ export const ingestKnowledgeSchema = z.object({
 });
 export type IngestKnowledgeInput = z.infer<typeof ingestKnowledgeSchema>;
 
-/** URL assinada para upload de documento de verificação de OAB. */
+/** URL assinada para upload de documento de verificação (ID/OAB/residência). */
 export const verificationUploadUrlSchema = z.object({
+  kind: z.enum(['IDENTITY', 'OAB', 'RESIDENCE', 'OTHER']),
   fileName: z.string().min(1).max(255),
   mimeType: z.string().min(1).max(150),
 });
 export type VerificationUploadUrlInput = z.infer<typeof verificationUploadUrlSchema>;
 
-/** Registro do documento de verificação de OAB após upload. */
+/** Registro do documento de verificação após upload. */
 export const registerVerificationDocSchema = z.object({
+  kind: z.enum(['IDENTITY', 'OAB', 'RESIDENCE', 'OTHER']),
   storageKey: z.string().min(1).max(512),
   fileName: z.string().min(1).max(255),
   mimeType: z.string().min(1).max(150),
@@ -156,11 +158,28 @@ export const registerVerificationDocSchema = z.object({
 });
 export type RegisterVerificationDocInput = z.infer<typeof registerVerificationDocSchema>;
 
-/** Validação de OAB no cadastro do advogado. */
+/** Cadastro completo do advogado (formulário do perfil profissional). */
 export const lawyerRegistrationSchema = z.object({
-  fullName: z.string().min(3).max(200),
-  oabNumber: z.string().min(2).max(20),
-  oabState: z.string().length(2),
+  fullName: z.string().min(3, 'Informe o nome completo.').max(200),
+  cpf: z.string().min(11, 'CPF inválido.').max(18),
+  email: z.string().email('E-mail inválido.').optional(),
+  phone: z.string().min(8, 'Telefone inválido.').max(20),
+  phone2: z.string().max(20).optional(),
+  birthDate: z.string().min(8, 'Informe a data de nascimento.'),
+  oabNumber: z.string().min(2, 'Informe o número da OAB.').max(20),
+  oabState: z.string().length(2, 'UF da OAB com 2 letras.'),
+  residentialAddress: z.string().min(5, 'Informe o endereço residencial.').max(300),
+  professionalAddress: z.string().min(5, 'Informe o endereço profissional.').max(300),
   specialties: z.array(z.string()).min(1, 'Selecione ao menos uma área de atuação.'),
 });
 export type LawyerRegistrationInput = z.infer<typeof lawyerRegistrationSchema>;
+
+/** Aceite do termo de responsabilidade do advogado. */
+export const acceptTermSchema = z.object({
+  accepted: z.literal(true),
+});
+export type AcceptTermInput = z.infer<typeof acceptTermSchema>;
+
+/** Tipos de documento exigidos do advogado. */
+export const documentKindSchema = z.enum(['IDENTITY', 'OAB', 'RESIDENCE', 'OTHER']);
+export type DocumentKindInput = z.infer<typeof documentKindSchema>;

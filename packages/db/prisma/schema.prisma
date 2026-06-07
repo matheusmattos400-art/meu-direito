@@ -123,6 +123,21 @@ enum DocumentPurpose {
   LAWYER_VERIFICATION // comprovante de OAB do advogado
 }
 
+enum DocumentKind {
+  IDENTITY // documento de identidade (RG/CNH)
+  OAB // carteira da OAB
+  RESIDENCE // comprovante de residência
+  OTHER
+}
+
+enum LawyerStatus {
+  PRE_REGISTRATION // preencheu o formulário, ainda não enviou documentação
+  IN_ANALYSIS // documentos enviados + termo aceito; em análise (24h)
+  ACTIVE // aprovado / pagamentos em dia
+  REJECTED // documentação reprovada
+  CANCELED // conta encerrada / parou de pagar
+}
+
 enum KnowledgeType {
   LEGISLATION // legislação
   JURISPRUDENCE // jurisprudência
@@ -170,10 +185,23 @@ model Lawyer {
   user         User               @relation(fields: [userId], references: [id])
   oabNumber    String
   oabState     String             @db.Char(2)
-  verification LawyerVerification @default(PENDING)
+  verification LawyerVerification @default(PENDING) // legado; usar `status`
   verifiedAt   DateTime?
   bio          String?
   officeName   String?
+
+  // Ciclo de conta (Pré-cadastro → Análise → Ativo / Rejeitado / Cancelado)
+  status              LawyerStatus @default(PRE_REGISTRATION)
+  cpf                 String?
+  phone               String?
+  phone2              String?
+  birthDate           DateTime?
+  residentialAddress  String?
+  professionalAddress String?
+  termAccepted        Boolean      @default(false)
+  termAcceptedAt      DateTime?
+  submittedAt         DateTime? // entrada em análise (marca o SLA de 24h)
+  decidedAt           DateTime?
 
   specialties           LawyerSpecialty[]
   assignments           CaseAssignment[]
@@ -329,6 +357,7 @@ model KanbanStage {
 model Document {
   id           String          @id @default(uuid())
   purpose      DocumentPurpose @default(CASE)
+  kind         DocumentKind? // tipo do comprovante (ID/OAB/residência)
   caseId       String?
   case         Case?           @relation(fields: [caseId], references: [id])
   lawyerId     String? // preenchido quando é comprovante de OAB
