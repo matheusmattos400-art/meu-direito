@@ -10,7 +10,8 @@ export const envSchema = z.object({
   WEB_URL: z.string().url().default('http://localhost:3000'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL é obrigatória.'),
   // Opcional em dev (sem auth o boot ainda funciona); o guard exige quando usado.
-  SUPABASE_JWT_SECRET: z.string().min(1).optional(),
+  // Aceita vazio (tratado como ausente) para conviver com .env de desenvolvimento.
+  SUPABASE_JWT_SECRET: z.string().optional(),
   // E-mails (separados por vírgula) promovidos a ADMIN no provisionamento.
   ADMIN_EMAILS: z.string().optional().default(''),
   // Atalho de autenticação SOMENTE para desenvolvimento (ignorado em produção).
