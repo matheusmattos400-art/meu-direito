@@ -3,7 +3,19 @@ import { Button } from '@app/ui';
 
 export default function HomePage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6 py-24">
+    <>
+      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
+        <span className="font-serif text-lg tracking-tightish">Meu Direito</span>
+        <nav className="flex items-center gap-5 text-sm text-muted-foreground">
+          <Link href="/suporte" className="hover:text-foreground">
+            Suporte
+          </Link>
+          <Link href="/login" className="hover:text-foreground">
+            Entrar
+          </Link>
+        </nav>
+      </header>
+      <main className="mx-auto flex min-h-[calc(100vh-72px)] max-w-3xl flex-col justify-center px-6 py-16">
       <span className="mb-6 text-xs uppercase tracking-[0.2em] text-muted-foreground">
         Orientação jurídica informativa
       </span>
@@ -29,6 +41,14 @@ export default function HomePage() {
         Esta plataforma oferece orientação informativa e não substitui a análise de um advogado
         habilitado. A validação jurídica final depende de um profissional.
       </p>
-    </main>
+      <p className="mt-4 text-sm text-muted-foreground">
+        Problema ou dúvida sobre o app?{' '}
+        <Link href="/suporte" className="text-accent hover:underline">
+          Fale com o suporte
+        </Link>
+        .
+      </p>
+      </main>
+    </>
   );
 }

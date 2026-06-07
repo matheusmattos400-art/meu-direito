@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Badge, Button, Card, CardContent, Spinner, Textarea, cn } from '@app/ui';
 import { apiFetch } from '@/lib/api';
-import { STATUS_META } from '../page';
+import { STATUS_META } from '@/lib/support-status';
 
 interface Message {
   id: string;

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Badge, Card, CardContent, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
+import { STATUS_META } from '@/lib/support-status';
 
 interface Ticket {
   id: string;
@@ -14,12 +15,6 @@ interface Ticket {
   messages: number;
   lastMessageAt: string;
 }
-
-export const STATUS_META: Record<Ticket['status'], { label: string; variant: 'danger' | 'warning' | 'success' }> = {
-  OPEN: { label: 'Não resolvido', variant: 'danger' },
-  IN_PROGRESS: { label: 'Em andamento', variant: 'warning' },
-  RESOLVED: { label: 'Resolvido', variant: 'success' },
-};
 
 const FILTERS: Array<{ key: 'ALL' | Ticket['status']; label: string }> = [
   { key: 'ALL', label: 'Todos' },

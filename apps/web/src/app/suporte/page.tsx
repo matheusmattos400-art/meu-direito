@@ -15,7 +15,7 @@ import {
   Textarea,
   cn,
 } from '@app/ui';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, ApiError } from '@/lib/api';
 
 interface TicketSummary {
   id: string;
@@ -46,19 +46,42 @@ export default function SuportePage() {
   const [tickets, setTickets] = useState<TicketSummary[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsLogin, setNeedsLogin] = useState(false);
 
   const loadList = useCallback(() => {
     return apiFetch<TicketSummary[]>('/support/tickets').then(setTickets);
   }, []);
 
   useEffect(() => {
-    loadList().finally(() => setLoading(false));
+    loadList()
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 401) setNeedsLogin(true);
+      })
+      .finally(() => setLoading(false));
   }, [loadList]);
 
   if (loading) {
     return (
       <main className="mx-auto min-h-screen max-w-2xl px-6 py-16">
         <Spinner className="text-muted-foreground" />
+      </main>
+    );
+  }
+
+  if (needsLogin) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Suporte da plataforma</CardTitle>
+            <CardDescription>Entre na sua conta para abrir um chamado e acompanhar as respostas.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/login">
+              <Button>Entrar para falar com o suporte</Button>
+            </Link>
+          </CardContent>
+        </Card>
       </main>
     );
   }
