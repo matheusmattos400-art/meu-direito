@@ -36,6 +36,25 @@ export const grantConsentSchema = z.object({
 });
 export type GrantConsentInput = z.infer<typeof grantConsentSchema>;
 
+/** Solicitação de URL assinada para upload de documento. */
+export const documentUploadUrlSchema = z.object({
+  caseId: z.string().uuid(),
+  fileName: z.string().min(1).max(255),
+  mimeType: z.string().min(1).max(150),
+});
+export type DocumentUploadUrlInput = z.infer<typeof documentUploadUrlSchema>;
+
+/** Registro dos metadados do documento após o upload direto ao Storage. */
+export const registerDocumentSchema = z.object({
+  caseId: z.string().uuid(),
+  storageKey: z.string().min(1).max(512),
+  fileName: z.string().min(1).max(255),
+  mimeType: z.string().min(1).max(150),
+  sizeBytes: z.number().int().nonnegative(),
+  checksum: z.string().max(128).optional(),
+});
+export type RegisterDocumentInput = z.infer<typeof registerDocumentSchema>;
+
 /** Aceite/recusa de uma oportunidade pelo advogado (Módulo C). */
 export const respondAssignmentSchema = z.object({
   assignmentId: z.string().uuid(),

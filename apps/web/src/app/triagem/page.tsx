@@ -13,6 +13,7 @@ import {
   cn,
 } from '@app/ui';
 import { apiFetch } from '@/lib/api';
+import { DocumentsPanel } from '@/components/documents-panel';
 
 type Role = 'user' | 'assistant';
 interface ChatMessage {
@@ -195,6 +196,8 @@ export default function TriagemPage() {
           </div>
 
           {analysis && <AnalysisCard analysis={analysis} />}
+
+          <DocumentsPanel caseId={caseInfo.id} />
         </div>
       )}
     </main>
