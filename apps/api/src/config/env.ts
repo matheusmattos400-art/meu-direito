@@ -8,6 +8,8 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   API_PORT: z.coerce.number().int().positive().default(3333),
   WEB_URL: z.string().url().default('http://localhost:3000'),
+  // App de administração (origem separada para CORS).
+  ADMIN_URL: z.string().url().default('http://localhost:3001'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL é obrigatória.'),
   // Opcional em dev (sem auth o boot ainda funciona); o guard exige quando usado.
   // Aceita vazio (tratado como ausente) para conviver com .env de desenvolvimento.

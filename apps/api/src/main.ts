@@ -12,7 +12,10 @@ async function bootstrap(): Promise<void> {
 
   app.use(helmet());
   app.enableCors({
-    origin: config.get<string>('WEB_URL'),
+    origin: [
+      config.get<string>('WEB_URL') ?? 'http://localhost:3000',
+      config.get<string>('ADMIN_URL') ?? 'http://localhost:3001',
+    ],
     credentials: true,
   });
   app.setGlobalPrefix('api');
