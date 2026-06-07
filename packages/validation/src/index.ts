@@ -140,6 +140,12 @@ export const assignLawyerSchema = z.object({
 });
 export type AssignLawyerInput = z.infer<typeof assignLawyerSchema>;
 
+/** Liberação manual de acesso de um advogado (7/30/60 dias) pelo suporte. */
+export const grantAccessSchema = z.object({
+  days: z.coerce.number().int().refine((d) => [7, 30, 60].includes(d), 'Período inválido (7, 30 ou 60).'),
+});
+export type GrantAccessInput = z.infer<typeof grantAccessSchema>;
+
 /** Atualização de status de um chamado (admin). */
 export const updateTicketSchema = z.object({
   status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED']),
@@ -238,6 +244,7 @@ export const lawyerRegistrationSchema = z.object({
   email: z.string().email('E-mail inválido.').optional(),
   phone: z.string().min(8, 'Telefone inválido.').max(20),
   phone2: z.string().max(20).optional(),
+  gender: z.enum(['M', 'F', 'OUTRO']).optional(),
   birthDate: z.string().min(8, 'Informe a data de nascimento.'),
   oabNumber: z.string().min(2, 'Informe o número da OAB.').max(20),
   oabState: z.string().length(2, 'UF da OAB com 2 letras.'),
@@ -257,6 +264,7 @@ export const adminCreateLawyerSchema = z.object({
   cpf: z.string().min(11, 'CPF inválido.').max(18),
   phone: z.string().min(8, 'Telefone inválido.').max(20),
   phone2: z.string().max(20).optional(),
+  gender: z.enum(['M', 'F', 'OUTRO']).optional(),
   birthDate: z.string().optional(),
   oabNumber: z.string().min(2).max(20),
   oabState: z.string().length(2),

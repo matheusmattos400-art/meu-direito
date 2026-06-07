@@ -3,10 +3,12 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { User } from '@app/db';
 import {
   assignLawyerSchema,
+  grantAccessSchema,
   supportAttachmentUrlSchema,
   ticketMessageSchema,
   updateTicketSchema,
   type AssignLawyerInput,
+  type GrantAccessInput,
   type SupportAttachmentUrlInput,
   type TicketMessageInput,
   type UpdateTicketInput,
@@ -89,5 +91,15 @@ export class SupportAdminController {
   @ApiOperation({ summary: 'Cancela o acesso do cliente com o advogado.' })
   cancelLawyer(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
     return this.support.cancelLawyer(user, id).then((data) => ({ data }));
+  }
+
+  @Post('tickets/:id/grant-access')
+  @ApiOperation({ summary: 'Libera acesso do advogado por 7/30/60 dias.' })
+  grantAccess(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(grantAccessSchema)) dto: GrantAccessInput,
+  ) {
+    return this.support.grantAccess(user, id, dto.days).then((data) => ({ data }));
   }
 }

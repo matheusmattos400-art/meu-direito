@@ -18,6 +18,7 @@ const SCOPES: Array<{ key: string; label: string }> = [
   { key: 'ADVOGADOS', label: 'Advogados' },
   { key: 'FINANCEIRO', label: 'Financeiro' },
   { key: 'SUPORTE', label: 'Suporte' },
+  { key: 'CADASTROS', label: 'Cadastros' },
   { key: 'USUARIOS', label: 'Usuários' },
 ];
 

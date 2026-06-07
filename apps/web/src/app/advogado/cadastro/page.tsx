@@ -30,6 +30,7 @@ const empty = {
   email: '',
   phone: '',
   phone2: '',
+  gender: '',
   birthDate: '',
   oabNumber: '',
   oabState: '',
@@ -60,6 +61,7 @@ export default function CadastroAdvogadoPage() {
           email: p.email ?? '',
           phone: p.phone ?? '',
           phone2: p.phone2 ?? '',
+          gender: '',
           birthDate: p.birthDate ? p.birthDate.slice(0, 10) : '',
           oabNumber: p.oabNumber ?? '',
           oabState: p.oabState ?? '',
@@ -94,6 +96,7 @@ export default function CadastroAdvogadoPage() {
           oabState: form.oabState.toUpperCase(),
           phone2: form.phone2 || undefined,
           email: form.email || undefined,
+          gender: form.gender || undefined,
           specialties: selected,
         }),
       });
@@ -137,6 +140,18 @@ export default function CadastroAdvogadoPage() {
             </Group>
             <Group label="Telefone 2">
               <Input value={form.phone2} onChange={(e) => set('phone2', e.target.value)} />
+            </Group>
+            <Group label="Sexo">
+              <select
+                value={form.gender}
+                onChange={(e) => set('gender', e.target.value)}
+                className="h-10 rounded-md border border-input bg-transparent px-3 text-sm"
+              >
+                <option value="">Não informar</option>
+                <option value="M">Masculino</option>
+                <option value="F">Feminino</option>
+                <option value="OUTRO">Outro</option>
+              </select>
             </Group>
           </CardContent>
         </Card>

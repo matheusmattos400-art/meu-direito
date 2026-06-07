@@ -126,6 +126,28 @@ export default function AdminTicketPage() {
     }
   }
 
+  async function grantAccess(days: number) {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await apiFetch<{ until: string; days: number }>(
+        `/admin/support/tickets/${id}/grant-access`,
+        { method: 'POST', body: JSON.stringify({ days }) },
+      );
+      await apiFetch(`/admin/support/tickets/${id}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({
+          body: `✅ Acesso liberado por ${days} dias (até ${new Date(r.until).toLocaleDateString('pt-BR')}).`,
+        }),
+      });
+      await fetchThread();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao liberar acesso.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function cancelLawyer() {
     if (!confirm('Cancelar o acesso deste cliente com o advogado atual?')) return;
     setBusy(true);
@@ -203,7 +225,7 @@ export default function AdminTicketPage() {
               }}
             />
             <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={busy}>
-              📎 Anexar boleto/documento
+              📎 {thread.requesterRole === 'LAWYER' ? 'Anexar boleto/documento' : 'Anexar documento'}
             </Button>
             {thread.status !== 'RESOLVED' && (
               <Button variant="accent" onClick={() => setStatus('RESOLVED')} disabled={busy}>
@@ -215,12 +237,31 @@ export default function AdminTicketPage() {
         </div>
       </div>
 
-      {/* Advogado do cliente */}
+      {/* Painel lateral — depende de quem abriu o chamado */}
       <aside>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Advogado do cliente</CardTitle>
-          </CardHeader>
+        {thread.requesterRole === 'LAWYER' ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Acesso do advogado</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <p className="text-sm text-muted-foreground">
+                Libere o acesso do advogado (ex.: perdeu o acesso por um problema, mesmo pagando).
+              </p>
+              <div className="flex gap-2">
+                {[7, 30, 60].map((d) => (
+                  <Button key={d} size="sm" variant="outline" disabled={busy} onClick={() => grantAccess(d)}>
+                    {d} dias
+                  </Button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Advogado do cliente</CardTitle>
+            </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {thread.currentLawyer ? (
               <div className="rounded-md border border-border p-3 text-sm">
@@ -265,7 +306,8 @@ export default function AdminTicketPage() {
               />
             )}
           </CardContent>
-        </Card>
+          </Card>
+        )}
       </aside>
     </div>
   );

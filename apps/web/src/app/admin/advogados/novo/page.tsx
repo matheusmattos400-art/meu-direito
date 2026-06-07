@@ -18,6 +18,7 @@ const empty = {
   cpf: '',
   phone: '',
   phone2: '',
+  gender: '',
   birthDate: '',
   oabNumber: '',
   oabState: '',
@@ -63,6 +64,7 @@ export default function NovoAdvogadoPage() {
           ...form,
           oabState: form.oabState.toUpperCase(),
           phone2: form.phone2 || undefined,
+          gender: form.gender || undefined,
           birthDate: form.birthDate || undefined,
           residentialAddress: form.residentialAddress || undefined,
           professionalAddress: form.professionalAddress || undefined,
@@ -127,6 +129,18 @@ export default function NovoAdvogadoPage() {
             </Group>
             <Group label="Telefone 2">
               <Input value={form.phone2} onChange={(e) => set('phone2', e.target.value)} />
+            </Group>
+            <Group label="Sexo">
+              <select
+                value={form.gender}
+                onChange={(e) => set('gender', e.target.value)}
+                className="h-10 rounded-md border border-input bg-transparent px-3 text-sm"
+              >
+                <option value="">Não informar</option>
+                <option value="M">Masculino</option>
+                <option value="F">Feminino</option>
+                <option value="OUTRO">Outro</option>
+              </select>
             </Group>
             <Group label="Número da OAB">
               <Input value={form.oabNumber} onChange={(e) => set('oabNumber', e.target.value)} required />

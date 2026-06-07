@@ -234,6 +234,52 @@ export class SupportService {
     return { cleared: true };
   }
 
+  /** Libera acesso de um advogado por N dias (ex.: perdeu acesso por bug, mesmo pagando). */
+  async grantAccess(admin: User, ticketId: string, days: number) {
+    const ticket = await this.prisma.supportTicket.findUnique({ where: { id: ticketId } });
+    if (!ticket) throw new NotFoundException('Chamado não encontrado.');
+    const lawyer = await this.prisma.lawyer.findUnique({ where: { userId: ticket.requesterId } });
+    if (!lawyer) throw new BadRequestException('Este chamado não é de um advogado.');
+
+    const now = new Date();
+    const until = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+    await this.prisma.lawyer.update({ where: { id: lawyer.id }, data: { status: 'ACTIVE' } });
+    await this.prisma.user.update({ where: { id: ticket.requesterId }, data: { status: 'ACTIVE' } });
+
+    const sub = await this.prisma.subscription.findFirst({
+      where: { lawyerUserId: ticket.requesterId },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (sub) {
+      await this.prisma.subscription.update({
+        where: { id: sub.id },
+        data: { status: 'ACTIVE', currentPeriodStart: now, currentPeriodEnd: until, gateway: 'manual', canceledAt: null },
+      });
+    } else {
+      await this.prisma.subscription.create({
+        data: {
+          lawyerUserId: ticket.requesterId,
+          planCode: 'STARTER',
+          status: 'ACTIVE',
+          gateway: 'manual',
+          currentPeriodStart: now,
+          currentPeriodEnd: until,
+        },
+      });
+    }
+
+    await this.audit.log({
+      actorId: admin.id,
+      actorRole: 'ADMIN',
+      action: 'ADMIN_GRANT_ACCESS',
+      entityType: 'Lawyer',
+      entityId: lawyer.id,
+      metadata: { days, until: until.toISOString() },
+    });
+    return { until, days };
+  }
+
   private async withdrawActive(citizenId: string) {
     const active = await this.prisma.caseAssignment.findMany({
       where: { status: 'ACCEPTED', case: { citizenId } },

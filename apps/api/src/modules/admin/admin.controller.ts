@@ -166,4 +166,11 @@ export class AdminController {
   notifications() {
     return this.admin.notifications().then((data) => ({ data }));
   }
+
+  @Get('people')
+  @RequireScope('CADASTROS')
+  @ApiOperation({ summary: 'Pessoas cadastradas (nome, telefone, região, sexo).' })
+  people() {
+    return this.admin.listPeople().then((data) => ({ data }));
+  }
 }

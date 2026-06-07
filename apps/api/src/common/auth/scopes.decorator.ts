@@ -1,8 +1,14 @@
 import { SetMetadata } from '@nestjs/common';
 
 /** Abas/áreas do backoffice controladas por escopo. */
-export type AdminScope = 'ADVOGADOS' | 'FINANCEIRO' | 'USUARIOS' | 'SUPORTE';
-export const ADMIN_SCOPES: AdminScope[] = ['ADVOGADOS', 'FINANCEIRO', 'USUARIOS', 'SUPORTE'];
+export type AdminScope = 'ADVOGADOS' | 'FINANCEIRO' | 'USUARIOS' | 'SUPORTE' | 'CADASTROS';
+export const ADMIN_SCOPES: AdminScope[] = [
+  'ADVOGADOS',
+  'FINANCEIRO',
+  'USUARIOS',
+  'SUPORTE',
+  'CADASTROS',
+];
 
 export const REQUIRE_SCOPE = 'requireScope';
 /** Exige que o admin tenha o escopo (ou seja o dono). */

@@ -131,6 +131,7 @@ export class AdminService {
               data: {
                 role: 'LAWYER',
                 fullName: dto.fullName,
+                ...(dto.gender ? { gender: dto.gender } : {}),
                 status: dto.status === 'ACTIVE' ? 'ACTIVE' : 'PENDING_VERIFICATION',
               },
             })
@@ -138,6 +139,7 @@ export class AdminService {
               data: {
                 email: dto.email,
                 fullName: dto.fullName,
+                gender: dto.gender ?? null,
                 role: 'LAWYER',
                 status: dto.status === 'ACTIVE' ? 'ACTIVE' : 'PENDING_VERIFICATION',
               },
@@ -670,6 +672,26 @@ export class AdminService {
     }
     const avgResponseMinutes = n > 0 ? Math.round(sum / n / 60000) : null;
     return { open, inProgress, resolved, avgResponseMinutes };
+  }
+
+  /** Registro de todas as pessoas cadastradas (nome, telefone, região, sexo). */
+  async listPeople() {
+    const users = await this.prisma.user.findMany({
+      where: { role: { in: ['CITIZEN', 'LAWYER'] } },
+      include: { lawyer: { select: { phone: true, oabState: true, city: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const GENDER: Record<string, string> = { M: 'Masculino', F: 'Feminino', OUTRO: 'Outro' };
+    return users.map((u) => ({
+      id: u.id,
+      name: u.fullName,
+      phone: u.phone ?? u.lawyer?.phone ?? null,
+      city: u.city ?? u.lawyer?.city ?? null,
+      state: u.state ?? u.lawyer?.oabState ?? null,
+      gender: u.gender ? (GENDER[u.gender] ?? u.gender) : null,
+      role: u.role,
+      createdAt: u.createdAt,
+    }));
   }
 
   /** Contadores para os badges de notificação do menu admin. */

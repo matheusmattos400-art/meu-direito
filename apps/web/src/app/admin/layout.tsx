@@ -12,6 +12,7 @@ const NAV: Array<{ href: string; label: string; icon: string; scope: string | nu
   { href: '/admin/advogados', label: 'Advogados', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM4 21v-1a6 6 0 0112 0v1', scope: 'ADVOGADOS' },
   { href: '/admin/financeiro', label: 'Financeiro', icon: 'M3 7h18v10H3zM3 11h18M7 15h3', scope: 'FINANCEIRO' },
   { href: '/admin/suporte', label: 'Suporte', icon: 'M21 11.5a8.38 8.38 0 01-8.5 8.5 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 0117 0z', scope: 'SUPORTE' },
+  { href: '/admin/cadastros', label: 'Cadastros', icon: 'M4 4h16v16H4zM4 9h16M9 4v16', scope: 'CADASTROS' },
   { href: '/admin/usuarios', label: 'Usuários', icon: 'M12 12a5 5 0 100-10 5 5 0 000 10zM3 21a9 9 0 0118 0', scope: 'USUARIOS' },
 ];
 

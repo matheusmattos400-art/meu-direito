@@ -102,6 +102,7 @@ export class IdentityService {
           role: 'LAWYER',
           fullName: dto.fullName,
           ...(dto.email ? { email: dto.email } : {}),
+          ...(dto.gender ? { gender: dto.gender } : {}),
         },
       });
 
