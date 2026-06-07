@@ -1,9 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { User } from '@app/db';
-import type { RejectLawyerInput } from '@app/validation';
+import type { AdminCreateLawyerInput, RejectLawyerInput } from '@app/validation';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { StorageService } from '../../common/storage/storage.service';
+import { findPlan, PLANS } from '../billing/plans';
 
 @Injectable()
 export class AdminService {
@@ -52,6 +53,12 @@ export class AdminService {
     return {
       lawyerId: l.id,
       status: l.status,
+      credentials: {
+        email: l.user.email,
+        // Senha provisória só existe para cadastros criados pelo backoffice.
+        provisionalPassword: l.provisionalPassword,
+        createdByAdmin: l.createdByAdmin,
+      },
       profile: {
         fullName: l.user.fullName,
         cpf: l.cpf,
@@ -74,6 +81,131 @@ export class AdminService {
           downloadUrl: await this.storage.createDownloadUrl(d.storageKey),
         })),
       ),
+    };
+  }
+
+  /** Cria um advogado diretamente (sem o formulário público), com login e senha. */
+  async createLawyer(admin: User, dto: AdminCreateLawyerInput) {
+    const categories = await this.prisma.category.findMany({
+      where: { slug: { in: dto.specialties } },
+    });
+    if (categories.length !== dto.specialties.length) {
+      throw new BadRequestException('Uma ou mais áreas de atuação são inválidas.');
+    }
+
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+      include: { lawyer: true },
+    });
+    if (existing?.lawyer) {
+      throw new ConflictException('Já existe um advogado com este e-mail.');
+    }
+
+    const birthDate = dto.birthDate ? new Date(dto.birthDate) : null;
+
+    const lawyer = await this.prisma.$transaction(
+      async (tx) => {
+        const user = existing
+          ? await tx.user.update({
+              where: { id: existing.id },
+              data: {
+                role: 'LAWYER',
+                fullName: dto.fullName,
+                status: dto.status === 'ACTIVE' ? 'ACTIVE' : 'PENDING_VERIFICATION',
+              },
+            })
+          : await tx.user.create({
+              data: {
+                email: dto.email,
+                fullName: dto.fullName,
+                role: 'LAWYER',
+                status: dto.status === 'ACTIVE' ? 'ACTIVE' : 'PENDING_VERIFICATION',
+              },
+            });
+
+        const created = await tx.lawyer.create({
+          data: {
+            userId: user.id,
+            status: dto.status,
+            createdByAdmin: true,
+            provisionalPassword: dto.password,
+            oabNumber: dto.oabNumber,
+            oabState: dto.oabState.toUpperCase(),
+            cpf: dto.cpf,
+            phone: dto.phone,
+            phone2: dto.phone2 ?? null,
+            birthDate: birthDate && !Number.isNaN(birthDate.getTime()) ? birthDate : null,
+            residentialAddress: dto.residentialAddress ?? null,
+            professionalAddress: dto.professionalAddress ?? null,
+          },
+        });
+
+        await tx.lawyerSpecialty.createMany({
+          data: categories.map((c) => ({ lawyerId: created.id, categoryId: c.id })),
+        });
+        await tx.kanbanStage.createMany({
+          data: [
+            { lawyerId: created.id, name: 'Triagem', order: 0 },
+            { lawyerId: created.id, name: 'Petição', order: 1 },
+            { lawyerId: created.id, name: 'Audiência', order: 2 },
+            { lawyerId: created.id, name: 'Concluído', order: 3 },
+          ],
+        });
+        return created;
+      },
+      { maxWait: 15_000, timeout: 30_000 },
+    );
+
+    await this.audit.log({
+      actorId: admin.id,
+      actorRole: 'ADMIN',
+      action: 'ADMIN_CREATE_LAWYER',
+      entityType: 'Lawyer',
+      entityId: lawyer.id,
+      metadata: { email: dto.email, status: dto.status },
+    });
+
+    return { lawyerId: lawyer.id, status: lawyer.status, email: dto.email };
+  }
+
+  // ---------------- Financeiro ----------------
+  async finance() {
+    const [activeSubs, payments] = await Promise.all([
+      this.prisma.subscription.findMany({ where: { status: 'ACTIVE' } }),
+      this.prisma.payment.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 25,
+        include: { payerUser: { select: { email: true, fullName: true } } },
+      }),
+    ]);
+
+    const planPrice = (code: string) => findPlan(code)?.priceBRL ?? 0;
+    const mrr = activeSubs.reduce((sum, s) => sum + planPrice(s.planCode), 0);
+
+    const byPlan = PLANS.map((p) => ({
+      plan: p.name,
+      price: p.priceBRL,
+      subscribers: activeSubs.filter((s) => s.planCode === p.code).length,
+    }));
+
+    const totalPaid = payments
+      .filter((p) => p.status === 'PAID')
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+
+    return {
+      activeSubscriptions: activeSubs.length,
+      mrr,
+      totalPaid,
+      byPlan,
+      payments: payments.map((p) => ({
+        id: p.id,
+        payer: p.payerUser.fullName ?? p.payerUser.email,
+        amount: Number(p.amount),
+        method: p.method,
+        status: p.status,
+        paidAt: p.paidAt,
+        createdAt: p.createdAt,
+      })),
     };
   }
 

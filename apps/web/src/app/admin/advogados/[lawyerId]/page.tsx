@@ -10,6 +10,11 @@ import { LAWYER_STATUS_META, type LawyerStatus } from '@/lib/lawyer-status';
 interface Detail {
   lawyerId: string;
   status: LawyerStatus;
+  credentials: {
+    email: string | null;
+    provisionalPassword: string | null;
+    createdByAdmin: boolean;
+  };
   profile: {
     fullName: string | null;
     cpf: string | null;
@@ -98,6 +103,22 @@ export default function LawyerDetailPage() {
           </p>
         )}
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Acesso do advogado</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
+          <Field label="Login (e-mail)" value={data.credentials.email} />
+          <Field
+            label="Senha"
+            value={
+              data.credentials.provisionalPassword ??
+              (data.credentials.createdByAdmin ? '—' : 'Definida pelo próprio advogado')
+            }
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

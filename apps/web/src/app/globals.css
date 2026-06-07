@@ -24,19 +24,21 @@
 }
 
 .dark {
-  --background: 24 10% 8%;
-  --foreground: 40 20% 92%;
-  --card: 24 10% 10%;
-  --card-foreground: 40 20% 92%;
-  --muted: 24 8% 16%;
-  --muted-foreground: 30 8% 64%;
-  --primary: 40 20% 92%;
-  --primary-foreground: 24 10% 10%;
-  --accent: 36 26% 56%;
-  --accent-foreground: 24 10% 10%;
-  --border: 24 8% 20%;
-  --input: 24 8% 20%;
-  --ring: 40 20% 70%;
+  /* Tema "tecnológico sofisticado": carvão frio profundo + acento dourado refinado. */
+  --background: 222 20% 6%;
+  --foreground: 40 24% 92%;
+  --card: 222 18% 9%;
+  --card-foreground: 40 24% 92%;
+  --muted: 222 14% 15%;
+  --muted-foreground: 220 10% 62%;
+  --primary: 42 38% 88%;
+  --primary-foreground: 222 22% 8%;
+  --accent: 41 60% 58%;
+  --accent-foreground: 222 22% 8%;
+  --border: 222 14% 16%;
+  --input: 222 14% 16%;
+  --ring: 41 50% 58%;
+  --radius: 0.625rem;
 }
 
 @layer base {
@@ -49,4 +51,15 @@
     font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
+}
+
+/* Textura tecnológica sutil no tema escuro (brilho radial + grade fina). */
+.dark body {
+  background-image:
+    radial-gradient(60rem 60rem at 100% -10%, hsl(41 60% 58% / 0.06), transparent 55%),
+    radial-gradient(50rem 50rem at -10% 0%, hsl(220 60% 60% / 0.05), transparent 50%),
+    linear-gradient(hsl(0 0% 100% / 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(0 0% 100% / 0.015) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 44px 44px, 44px 44px;
+  background-attachment: fixed;
 }

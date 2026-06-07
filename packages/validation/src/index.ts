@@ -174,6 +174,24 @@ export const lawyerRegistrationSchema = z.object({
 });
 export type LawyerRegistrationInput = z.infer<typeof lawyerRegistrationSchema>;
 
+/** Criação de advogado diretamente pelo backoffice (com login e senha). */
+export const adminCreateLawyerSchema = z.object({
+  fullName: z.string().min(3, 'Informe o nome completo.').max(200),
+  email: z.string().email('E-mail inválido.'),
+  password: z.string().min(6, 'A senha deve ter ao menos 6 caracteres.').max(100),
+  cpf: z.string().min(11, 'CPF inválido.').max(18),
+  phone: z.string().min(8, 'Telefone inválido.').max(20),
+  phone2: z.string().max(20).optional(),
+  birthDate: z.string().optional(),
+  oabNumber: z.string().min(2).max(20),
+  oabState: z.string().length(2),
+  residentialAddress: z.string().max(300).optional(),
+  professionalAddress: z.string().max(300).optional(),
+  specialties: z.array(z.string()).min(1, 'Selecione ao menos uma área.'),
+  status: z.enum(['PRE_REGISTRATION', 'IN_ANALYSIS', 'ACTIVE']).default('ACTIVE'),
+});
+export type AdminCreateLawyerInput = z.infer<typeof adminCreateLawyerSchema>;
+
 /** Aceite do termo de responsabilidade do advogado. */
 export const acceptTermSchema = z.object({
   accepted: z.literal(true),

@@ -1,7 +1,12 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { User } from '@app/db';
-import { rejectLawyerSchema, type RejectLawyerInput } from '@app/validation';
+import {
+  adminCreateLawyerSchema,
+  rejectLawyerSchema,
+  type AdminCreateLawyerInput,
+  type RejectLawyerInput,
+} from '@app/validation';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { Roles } from '../../common/auth/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
@@ -18,6 +23,21 @@ export class AdminController {
   @ApiOperation({ summary: 'Lista os advogados (status, estado, nº de processos).' })
   lawyers() {
     return this.admin.listLawyers().then((data) => ({ data }));
+  }
+
+  @Post('lawyers')
+  @ApiOperation({ summary: 'Cria um advogado diretamente (com login e senha).' })
+  createLawyer(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(adminCreateLawyerSchema)) dto: AdminCreateLawyerInput,
+  ) {
+    return this.admin.createLawyer(user, dto).then((data) => ({ data }));
+  }
+
+  @Get('finance')
+  @ApiOperation({ summary: 'Visão financeira (assinaturas, MRR, pagamentos).' })
+  finance() {
+    return this.admin.finance().then((data) => ({ data }));
   }
 
   @Get('lawyers/:lawyerId')

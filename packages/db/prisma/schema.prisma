@@ -202,6 +202,8 @@ model Lawyer {
   termAcceptedAt      DateTime?
   submittedAt         DateTime? // entrada em análise (marca o SLA de 24h)
   decidedAt           DateTime?
+  createdByAdmin      Boolean      @default(false) // cadastrado direto pelo backoffice
+  provisionalPassword String? // senha provisória definida pelo admin (bootstrap)
 
   specialties           LawyerSpecialty[]
   assignments           CaseAssignment[]

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Badge, Card, CardContent, Spinner } from '@app/ui';
+import { Badge, Button, Card, CardContent, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
 import { LAWYER_STATUS_META, type LawyerStatus } from '@/lib/lawyer-status';
 
@@ -60,9 +60,14 @@ export default function AdvogadosPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <header>
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Cadastros</p>
-        <h1 className="mt-1 font-serif text-4xl tracking-tightish">Advogados</h1>
+      <header className="flex items-end justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Cadastros</p>
+          <h1 className="mt-1 font-serif text-4xl tracking-tightish">Advogados</h1>
+        </div>
+        <Link href="/admin/advogados/novo">
+          <Button size="sm">+ Novo advogado</Button>
+        </Link>
       </header>
 
       <div className="flex flex-wrap gap-2 border-b border-border pb-3">
