@@ -182,6 +182,21 @@ export const subscribeSchema = z.object({
 });
 export type SubscribeInput = z.infer<typeof subscribeSchema>;
 
+/**
+ * Assinatura/atualização do combo do advogado: um plano combo (planCode) OU
+ * um conjunto de áreas montado por ele (areaIds). Migrar/cancelar área = reenviar.
+ */
+export const subscribeComboSchema = z
+  .object({
+    planCode: z.string().min(1).max(40).optional(),
+    areaIds: z.array(z.string().uuid()).optional(),
+    method: z.enum(['PIX', 'BOLETO', 'CREDIT_CARD']).default('PIX'),
+  })
+  .refine((d) => !!d.planCode || (d.areaIds?.length ?? 0) > 0, {
+    message: 'Escolha um combo ou ao menos uma área.',
+  });
+export type SubscribeComboInput = z.infer<typeof subscribeComboSchema>;
+
 /** Adiciona um processo para acompanhamento (Datajud). */
 export const addProcessSchema = z.object({
   processNumber: z
