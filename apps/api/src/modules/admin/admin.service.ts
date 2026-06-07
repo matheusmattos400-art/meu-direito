@@ -621,6 +621,8 @@ export class AdminService {
     const conversionRate =
       qualifiedOrBeyond > 0 ? Math.round((assignedOrBeyond / qualifiedOrBeyond) * 100) : 0;
 
+    const support = await this.supportMetrics();
+
     return {
       newUsers30d: newUsers,
       conversionRatePct: conversionRate,
@@ -634,6 +636,48 @@ export class AdminService {
         state: g.state,
         count: g._count._all,
       })),
+      support,
     };
+  }
+
+  /** Métricas de suporte (abertos/em andamento/resolvidos + tempo médio de 1ª resposta). */
+  private async supportMetrics() {
+    const [open, inProgress, resolved] = await Promise.all([
+      this.prisma.supportTicket.count({ where: { status: 'OPEN' } }),
+      this.prisma.supportTicket.count({ where: { status: 'IN_PROGRESS' } }),
+      this.prisma.supportTicket.count({ where: { status: 'RESOLVED' } }),
+    ]);
+
+    const tickets = await this.prisma.supportTicket.findMany({
+      select: {
+        createdAt: true,
+        messages: {
+          where: { authorRole: 'ADMIN' },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: { createdAt: true },
+        },
+      },
+    });
+    let sum = 0;
+    let n = 0;
+    for (const t of tickets) {
+      const first = t.messages[0];
+      if (first) {
+        sum += first.createdAt.getTime() - t.createdAt.getTime();
+        n += 1;
+      }
+    }
+    const avgResponseMinutes = n > 0 ? Math.round(sum / n / 60000) : null;
+    return { open, inProgress, resolved, avgResponseMinutes };
+  }
+
+  /** Contadores para os badges de notificação do menu admin. */
+  async notifications() {
+    const [supportOpen, lawyersPending] = await Promise.all([
+      this.prisma.supportTicket.count({ where: { status: 'OPEN' } }),
+      this.prisma.lawyer.count({ where: { status: 'IN_ANALYSIS' } }),
+    ]);
+    return { supportOpen, lawyersPending };
   }
 }

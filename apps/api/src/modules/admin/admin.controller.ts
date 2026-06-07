@@ -160,4 +160,10 @@ export class AdminController {
   stats() {
     return this.admin.stats().then((data) => ({ data }));
   }
+
+  @Get('notifications')
+  @ApiOperation({ summary: 'Contadores para os badges do menu (chamados abertos, advogados em análise).' })
+  notifications() {
+    return this.admin.notifications().then((data) => ({ data }));
+  }
 }

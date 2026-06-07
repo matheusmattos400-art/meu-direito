@@ -10,6 +10,12 @@ interface Stats {
   casesByStatus: Array<{ status: string; count: number }>;
   casesByCategory: Array<{ category: string; count: number }>;
   casesByCity: Array<{ city: string | null; state: string | null; count: number }>;
+  support: {
+    open: number;
+    inProgress: number;
+    resolved: number;
+    avgResponseMinutes: number | null;
+  };
 }
 
 export default function AdminDashboard() {
@@ -48,6 +54,19 @@ export default function AdminDashboard() {
         />
       </div>
 
+      <section>
+        <h2 className="mb-3 font-serif text-lg tracking-tightish">Suporte</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Metric label="Chamados abertos" value={String(stats.support.open)} accent={stats.support.open > 0} />
+          <Metric label="Em andamento" value={String(stats.support.inProgress)} />
+          <Metric label="Resolvidos" value={String(stats.support.resolved)} />
+          <Metric
+            label="Tempo médio de resposta"
+            value={fmtMinutes(stats.support.avgResponseMinutes)}
+          />
+        </div>
+      </section>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Distribution title="Casos por categoria" rows={stats.casesByCategory.map((r) => ({ label: r.category, count: r.count }))} />
         <Distribution title="Casos por status" rows={stats.casesByStatus.map((r) => ({ label: prettyStatus(r.status), count: r.count }))} />
@@ -73,7 +92,7 @@ function Metric({
   accent,
 }: {
   label: string;
-  hint: string;
+  hint?: string;
   value: string;
   accent?: boolean;
 }) {
@@ -86,7 +105,7 @@ function Metric({
         />
         <p className="text-sm text-muted-foreground">{label}</p>
         <p className="mt-3 font-serif text-4xl tracking-tightish tabular-nums">{value}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+        {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
       </CardContent>
     </Card>
   );
@@ -132,6 +151,14 @@ function Distribution({
       </CardContent>
     </Card>
   );
+}
+
+function fmtMinutes(min: number | null): string {
+  if (min === null) return '—';
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m ? `${h}h ${m}min` : `${h}h`;
 }
 
 function prettyStatus(s: string): string {

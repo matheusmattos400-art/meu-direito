@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import * as jwt from 'jsonwebtoken';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { PrismaService } from '../prisma/prisma.service';
 import { IS_PUBLIC_KEY } from './public.decorator';
 import type { AuthenticatedRequest } from './authenticated-request';
@@ -46,22 +47,8 @@ export class SupabaseAuthGuard implements CanActivate {
       throw new UnauthorizedException('Token de autenticação ausente.');
     }
 
-    const secret = this.config.get<string>('SUPABASE_JWT_SECRET');
-    if (!secret) {
-      throw new UnauthorizedException('Autenticação não configurada no servidor.');
-    }
-
     const token = header.slice('Bearer '.length);
-    let payload: jwt.JwtPayload;
-    try {
-      const decoded = jwt.verify(token, secret);
-      if (typeof decoded === 'string' || !decoded.sub) {
-        throw new Error('payload inválido');
-      }
-      payload = decoded;
-    } catch {
-      throw new UnauthorizedException('Token inválido ou expirado.');
-    }
+    const payload = await this.verifyToken(token);
 
     const authUserId = payload.sub as string;
     const email = typeof payload.email === 'string' ? payload.email : undefined;
@@ -132,6 +119,52 @@ export class SupabaseAuthGuard implements CanActivate {
     request.authUser = { id: user.authUserId ?? user.id, email: devEmail };
     request.user = user;
     return true;
+  }
+
+  private jwks?: ReturnType<typeof createRemoteJWKSet>;
+
+  private getJwks() {
+    if (!this.jwks) {
+      const url = this.config.get<string>('SUPABASE_URL');
+      if (!url) throw new UnauthorizedException('Autenticação não configurada no servidor.');
+      this.jwks = createRemoteJWKSet(new URL(`${url}/auth/v1/.well-known/jwks.json`));
+    }
+    return this.jwks;
+  }
+
+  /**
+   * Verifica o token do Supabase. Tokens de usuário são ES256 (chave
+   * assimétrica via JWKS); chaves/legado podem ser HS256 (JWT Secret).
+   */
+  private async verifyToken(token: string): Promise<{ sub?: string; email?: string }> {
+    let alg: string | undefined;
+    try {
+      const raw = token.split('.')[0] ?? '';
+      alg = JSON.parse(Buffer.from(raw, 'base64url').toString()).alg as string;
+    } catch {
+      throw new UnauthorizedException('Token inválido.');
+    }
+
+    try {
+      if (alg && alg.startsWith('HS')) {
+        const secret = this.config.get<string>('SUPABASE_JWT_SECRET');
+        if (!secret) throw new Error('sem secret');
+        const decoded = jwt.verify(token, secret);
+        if (typeof decoded === 'string' || !decoded.sub) throw new Error('payload inválido');
+        return {
+          sub: decoded.sub,
+          email: typeof decoded.email === 'string' ? decoded.email : undefined,
+        };
+      }
+      const { payload } = await jwtVerify(token, this.getJwks());
+      if (!payload.sub) throw new Error('sem sub');
+      return {
+        sub: payload.sub,
+        email: typeof payload.email === 'string' ? payload.email : undefined,
+      };
+    } catch {
+      throw new UnauthorizedException('Token inválido ou expirado.');
+    }
   }
 
   private adminEmails(): string[] {

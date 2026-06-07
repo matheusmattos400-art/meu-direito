@@ -12,6 +12,11 @@ export const envSchema = z.object({
   // Opcional em dev (sem auth o boot ainda funciona); o guard exige quando usado.
   // Aceita vazio (tratado como ausente) para conviver com .env de desenvolvimento.
   SUPABASE_JWT_SECRET: z.string().optional(),
+  // Supabase (Auth via JWKS + Storage).
+  SUPABASE_URL: z.string().optional(),
+  SUPABASE_ANON_KEY: z.string().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  SUPABASE_STORAGE_BUCKET: z.string().optional().default('documents'),
   // E-mails (separados por vírgula) promovidos a ADMIN no provisionamento.
   ADMIN_EMAILS: z.string().optional().default(''),
   // Atalho de autenticação SOMENTE para desenvolvimento (ignorado em produção).

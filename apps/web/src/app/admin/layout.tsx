@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Spinner } from '@app/ui';
 import { useMe } from '@/lib/use-me';
+import { apiFetch } from '@/lib/api';
 
 const NAV: Array<{ href: string; label: string; icon: string; scope: string | null }> = [
   { href: '/admin', label: 'Painel', icon: 'M3 12l9-9 9 9M5 10v10h14V10', scope: null },
@@ -19,6 +20,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [notif, setNotif] = useState<{ supportOpen: number; lawyersPending: number }>({
+    supportOpen: 0,
+    lawyersPending: 0,
+  });
 
   useEffect(() => {
     setCollapsed(localStorage.getItem('adminSidebarCollapsed') === '1');
@@ -26,6 +31,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!loading && me?.role !== 'ADMIN') router.replace('/');
   }, [loading, me, router]);
+  useEffect(() => {
+    if (me?.role !== 'ADMIN') return;
+    let active = true;
+    const load = () =>
+      apiFetch<{ supportOpen: number; lawyersPending: number }>('/admin/notifications')
+        .then((n) => active && setNotif(n))
+        .catch(() => {});
+    load();
+    const timer = setInterval(load, 20000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [me]);
 
   function toggle() {
     setCollapsed((c) => {
@@ -82,19 +101,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <nav className="flex flex-col gap-1">
           {nav.map((item) => {
             const active = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
+            const count =
+              item.scope === 'SUPORTE' ? notif.supportOpen : item.scope === 'ADVOGADOS' ? notif.lawyersPending : 0;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 title={collapsed ? item.label : undefined}
-                className={`flex items-center gap-3 rounded-lg py-2 text-sm transition-colors ${
+                className={`relative flex items-center gap-3 rounded-lg py-2 text-sm transition-colors ${
                   collapsed ? 'justify-center px-0' : 'px-3'
                 } ${active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
               >
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
                   <path d={item.icon} />
                 </svg>
-                {!collapsed && item.label}
+                {!collapsed && <span className="flex-1">{item.label}</span>}
+                {count > 0 &&
+                  (collapsed ? (
+                    <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-accent" />
+                  ) : (
+                    <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-accent-foreground">
+                      {count}
+                    </span>
+                  ))}
               </Link>
             );
           })}
