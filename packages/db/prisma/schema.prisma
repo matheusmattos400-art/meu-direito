@@ -458,6 +458,8 @@ model ProcessMonitoring {
 
   processNumber String // número CNJ
   court         String? // tribunal
+  orgaoJulgador String? // vara/órgão julgador (do Datajud)
+  partyName     String? // nome da parte/cliente (informado pelo advogado)
   className     String?
   subject       String?
   active        Boolean   @default(true)

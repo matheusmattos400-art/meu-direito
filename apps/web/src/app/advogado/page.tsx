@@ -13,6 +13,7 @@ interface Movement {
 interface Preview {
   processNumber: string;
   court: string | null;
+  orgaoJulgador: string | null;
   className: string | null;
   subject: string | null;
   movements: Movement[];
@@ -53,6 +54,7 @@ const CARDS = [
 
 export default function AdvogadoDashboard() {
   const [counts, setCounts] = useState<Record<string, number | undefined>>({});
+  const [savedTick, setSavedTick] = useState(0);
   const trackRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -118,14 +120,114 @@ export default function AdvogadoDashboard() {
       </div>
 
       {/* Consulta Datajud */}
-      <DatajudConsult />
+      <DatajudConsult onSaved={() => setSavedTick((t) => t + 1)} />
+
+      {/* Processos em acompanhamento (salvos) */}
+      <FollowedProcesses reloadKey={savedTick} />
     </div>
   );
 }
 
-function DatajudConsult() {
+interface Followed {
+  id: string;
+  processNumber: string;
+  court: string | null;
+  orgaoJulgador: string | null;
+  partyName: string | null;
+  className: string | null;
+  subject: string | null;
+  lastSyncedAt: string | null;
+  lastMovement: { text: string; rawText: string; occurredAt: string | null } | null;
+}
+
+function FollowedProcesses({ reloadKey }: { reloadKey: number }) {
+  const [items, setItems] = useState<Followed[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState<string | null>(null);
+  const [flash, setFlash] = useState<Record<string, string>>({});
+
+  function load() {
+    apiFetch<Followed[]>('/processos')
+      .then(setItems)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }
+  useEffect(load, [reloadKey]);
+
+  async function update(id: string) {
+    setSyncing(id);
+    try {
+      const r = await apiFetch<{ added: number }>(`/processos/${id}/sync`, { method: 'POST' });
+      setFlash((f) => ({ ...f, [id]: r.added > 0 ? `${r.added} nova(s) movimentação(ões)` : 'Sem novidades' }));
+      setTimeout(() => setFlash((f) => ({ ...f, [id]: '' })), 2500);
+      load();
+    } finally {
+      setSyncing(null);
+    }
+  }
+
+  if (loading || items.length === 0) return null;
+
+  return (
+    <section className="flex flex-col gap-4">
+      <h2 className="font-serif text-xl tracking-tightish">Acompanhando</h2>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {items.map((p) => (
+          <Card key={p.id}>
+            <CardContent className="flex flex-col gap-3 pt-6">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  {p.partyName && <p className="truncate font-medium">{p.partyName}</p>}
+                  <p className="font-mono text-xs text-muted-foreground">{p.processNumber}</p>
+                </div>
+                <button
+                  onClick={() => update(p.id)}
+                  disabled={syncing === p.id}
+                  className="shrink-0 rounded-full border border-border p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  title="Atualizar (buscar novas movimentações)"
+                  aria-label="Atualizar"
+                >
+                  {syncing === p.id ? <Spinner /> : (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 2v6h-6M3 12a9 9 0 0115-6.7L21 8M3 22v-6h6M21 12a9 9 0 01-15 6.7L3 16" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              <div className="text-sm text-muted-foreground">
+                {[p.className, p.subject].filter(Boolean).join(' · ') || 'Processo'}
+                {p.orgaoJulgador && <span className="block">Vara: {p.orgaoJulgador}{p.court ? ` · ${p.court}` : ''}</span>}
+              </div>
+
+              <div className="rounded-md border border-border bg-muted/30 p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Último andamento</p>
+                {p.lastMovement ? (
+                  <>
+                    <p className="mt-1 text-sm font-medium">{p.lastMovement.rawText}</p>
+                    <p className="text-sm text-muted-foreground">{p.lastMovement.text}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {p.lastMovement.occurredAt ? new Date(p.lastMovement.occurredAt).toLocaleDateString('pt-BR') : '—'}
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-1 text-sm text-muted-foreground">Aguardando sincronização.</p>
+                )}
+              </div>
+
+              {flash[p.id] && <p className="text-xs text-accent">{flash[p.id]}</p>}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DatajudConsult({ onSaved }: { onSaved: () => void }) {
   const [number, setNumber] = useState('');
   const [court, setCourt] = useState('');
+  const [party, setParty] = useState('');
   const [result, setResult] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -157,6 +259,7 @@ function DatajudConsult() {
     setResult(null);
     setNumber('');
     setCourt('');
+    setParty('');
     setConfirmClear(false);
     setError(null);
   }
@@ -167,9 +270,14 @@ function DatajudConsult() {
     try {
       await apiFetch('/processos', {
         method: 'POST',
-        body: JSON.stringify({ processNumber: result.processNumber, court: result.court ?? undefined }),
+        body: JSON.stringify({
+          processNumber: result.processNumber,
+          court: result.court ?? undefined,
+          partyName: party.trim() || undefined,
+        }),
       });
       reset();
+      onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao salvar acompanhamento.');
       setConfirmClear(false);
@@ -229,6 +337,9 @@ function DatajudConsult() {
                 <p className="text-sm text-muted-foreground">
                   {[result.className, result.subject, result.court].filter(Boolean).join(' · ') || 'Processo localizado'}
                 </p>
+                {result.orgaoJulgador && (
+                  <p className="text-xs text-muted-foreground">Vara: {result.orgaoJulgador}</p>
+                )}
               </div>
               <Badge variant="neutral">{result.movements.length} movimento(s)</Badge>
             </div>
@@ -259,9 +370,15 @@ function DatajudConsult() {
               pequena defasagem em relação a agregadores privados.
             </p>
 
-            <Button onClick={saveFollow} disabled={saving} className="self-start">
-              {saving ? <Spinner /> : 'Salvar para acompanhar'}
-            </Button>
+            <div className="flex flex-wrap items-end gap-2 border-t border-border pt-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground">Nome da parte / cliente (opcional)</label>
+                <Input value={party} onChange={(e) => setParty(e.target.value)} placeholder="Ex.: João da Silva" className="w-64" />
+              </div>
+              <Button onClick={saveFollow} disabled={saving}>
+                {saving ? <Spinner /> : 'Salvar para acompanhar'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

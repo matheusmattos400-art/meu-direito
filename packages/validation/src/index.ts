@@ -205,6 +205,7 @@ export const addProcessSchema = z.object({
     .max(30)
     .regex(/[\d.\-]+/, 'Use apenas números e os separadores . -'),
   court: z.string().max(40).optional(),
+  partyName: z.string().max(120).optional(),
   caseId: z.string().uuid().optional(),
 });
 export type AddProcessInput = z.infer<typeof addProcessSchema>;

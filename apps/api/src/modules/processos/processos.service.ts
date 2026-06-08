@@ -16,18 +16,34 @@ export class ProcessosService {
     private readonly lawyerCtx: LawyerContextService,
   ) {}
 
-  /** Adiciona um processo ao acompanhamento do usuário (cidadão ou advogado). */
+  /** Adiciona (ou reaproveita) um processo no acompanhamento. Idempotente. */
   async add(user: User, dto: AddProcessInput) {
     const owner = await this.ownerFields(user);
+    const where = await this.ownerWhere(user);
 
-    const monitoring = await this.prisma.processMonitoring.create({
-      data: {
-        ...owner,
-        caseId: dto.caseId ?? null,
-        processNumber: dto.processNumber,
-        court: dto.court ?? null,
-      },
+    // Já acompanha? Atualiza a parte/tribunal e reativa, em vez de duplicar.
+    const existing = await this.prisma.processMonitoring.findFirst({
+      where: { ...where, processNumber: dto.processNumber },
     });
+
+    const monitoring = existing
+      ? await this.prisma.processMonitoring.update({
+          where: { id: existing.id },
+          data: {
+            active: true,
+            partyName: dto.partyName ?? existing.partyName,
+            court: dto.court ?? existing.court,
+          },
+        })
+      : await this.prisma.processMonitoring.create({
+          data: {
+            ...owner,
+            caseId: dto.caseId ?? null,
+            processNumber: dto.processNumber,
+            court: dto.court ?? null,
+            partyName: dto.partyName ?? null,
+          },
+        });
 
     await this.audit.log({
       actorId: user.id,
@@ -47,8 +63,19 @@ export class ProcessosService {
     const items = await this.prisma.processMonitoring.findMany({
       where: { ...where, active: true },
       orderBy: { updatedAt: 'desc' },
+      include: {
+        movements: { orderBy: { occurredAt: { sort: 'desc', nulls: 'last' } }, take: 1 },
+      },
     });
-    return items.map((p) => this.toSummary(p));
+    return items.map((p) => {
+      const last = p.movements[0];
+      return {
+        ...this.toSummary(p),
+        lastMovement: last
+          ? { text: last.simplifiedText, rawText: last.rawText, occurredAt: last.occurredAt }
+          : null,
+      };
+    });
   }
 
   async detail(user: User, id: string) {
@@ -123,6 +150,7 @@ export class ProcessosService {
       where: { id: monitoring.id },
       data: {
         court: monitoring.court ?? result.court,
+        orgaoJulgador: result.orgaoJulgador ?? monitoring.orgaoJulgador,
         className: result.className,
         subject: result.subject,
         lastSyncedAt: new Date(),
@@ -177,6 +205,8 @@ export class ProcessosService {
       id: p.id,
       processNumber: p.processNumber,
       court: p.court,
+      orgaoJulgador: p.orgaoJulgador,
+      partyName: p.partyName,
       className: p.className,
       subject: p.subject,
       lastSyncedAt: p.lastSyncedAt,

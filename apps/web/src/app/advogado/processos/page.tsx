@@ -8,9 +8,12 @@ interface Processo {
   id: string;
   processNumber: string;
   court: string | null;
+  orgaoJulgador: string | null;
+  partyName: string | null;
   className: string | null;
   subject: string | null;
   lastSyncedAt: string | null;
+  lastMovement: { text: string; rawText: string; occurredAt: string | null } | null;
 }
 
 export default function ProcessosPage() {
@@ -30,7 +33,9 @@ export default function ProcessosPage() {
     const t = q.trim().toLowerCase();
     if (!t) return items;
     return items.filter((p) =>
-      [p.processNumber, p.className, p.subject, p.court].some((v) => (v ?? '').toLowerCase().includes(t)),
+      [p.processNumber, p.partyName, p.className, p.subject, p.court, p.orgaoJulgador].some((v) =>
+        (v ?? '').toLowerCase().includes(t),
+      ),
     );
   }, [items, q]);
 
@@ -65,19 +70,28 @@ export default function ProcessosPage() {
         <div className="flex flex-col gap-3">
           {filtered.map((p) => (
             <Card key={p.id} className="transition-colors hover:border-ring">
-              <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
-                <div className="min-w-0">
-                  <p className="font-mono text-sm">{p.processNumber}</p>
-                  <p className="truncate text-sm text-muted-foreground">
-                    {[p.className, p.subject, p.court].filter(Boolean).join(' · ') || 'Processo'}
-                  </p>
-                </div>
-                <div className="text-right">
+              <CardContent className="flex flex-col gap-2 py-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    {p.partyName && <p className="font-medium">{p.partyName}</p>}
+                    <p className="font-mono text-xs text-muted-foreground">{p.processNumber}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {[p.className, p.subject].filter(Boolean).join(' · ') || 'Processo'}
+                      {p.orgaoJulgador ? ` · ${p.orgaoJulgador}` : ''}
+                      {p.court ? ` · ${p.court}` : ''}
+                    </p>
+                  </div>
                   <Badge variant="success" dot>Em acompanhamento</Badge>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {p.lastSyncedAt ? `Atualizado ${new Date(p.lastSyncedAt).toLocaleDateString('pt-BR')}` : 'Aguardando sincronização'}
-                  </p>
                 </div>
+                {p.lastMovement && (
+                  <div className="rounded-md border border-border bg-muted/30 p-2.5 text-sm">
+                    <span className="font-medium">{p.lastMovement.rawText}</span>
+                    <span className="text-muted-foreground"> — {p.lastMovement.text} </span>
+                    <span className="text-xs text-muted-foreground">
+                      ({p.lastMovement.occurredAt ? new Date(p.lastMovement.occurredAt).toLocaleDateString('pt-BR') : '—'})
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}

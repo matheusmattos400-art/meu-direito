@@ -9,6 +9,7 @@ export interface DatajudMovement {
 
 export interface DatajudProcess {
   court: string | null;
+  orgaoJulgador: string | null;
   className: string | null;
   subject: string | null;
   movements: DatajudMovement[];
@@ -45,7 +46,7 @@ export class DatajudService {
     const alias = this.resolveAliasFromNumber(processNumber) ?? this.resolveAlias(court);
     if (!alias) {
       this.logger.warn(`Tribunal não resolvido para ${processNumber} (court=${court}).`);
-      return { court: court ?? null, className: null, subject: null, movements: [] };
+      return { court: court ?? null, orgaoJulgador: null, className: null, subject: null, movements: [] };
     }
 
     const apiKey = this.config.get<string>('DATAJUD_API_KEY');
@@ -63,7 +64,7 @@ export class DatajudService {
 
     if (!res.ok) {
       this.logger.error(`Datajud respondeu ${res.status}`);
-      return { court: court ?? null, className: null, subject: null, movements: [] };
+      return { court: court ?? null, orgaoJulgador: null, className: null, subject: null, movements: [] };
     }
 
     return this.parseResponse((await res.json()) as unknown, court);
@@ -77,6 +78,7 @@ export class DatajudService {
     let className: string | null = null;
     let subject: string | null = null;
     let tribunal: string | null = null;
+    let orgaoJulgador: string | null = null;
     const movements: DatajudMovement[] = [];
     const seen = new Set<string>();
 
@@ -85,6 +87,8 @@ export class DatajudService {
     for (const h of hits) {
       const source = h._source ?? {};
       tribunal = tribunal ?? ((source['tribunal'] as string) ?? null);
+      orgaoJulgador =
+        orgaoJulgador ?? ((source['orgaoJulgador'] as { nome?: string })?.nome ?? null);
       className = className ?? ((source['classe'] as { nome?: string })?.nome ?? null);
       subject =
         subject ??
@@ -106,7 +110,7 @@ export class DatajudService {
       }
     }
 
-    return { court: tribunal ?? court ?? null, className, subject, movements };
+    return { court: tribunal ?? court ?? null, orgaoJulgador, className, subject, movements };
   }
 
   private resolveAlias(court?: string): string | null {
@@ -155,6 +159,7 @@ export class DatajudService {
   private mockProcess(processNumber: string, court?: string): DatajudProcess {
     return {
       court: court ?? 'TJSP',
+      orgaoJulgador: '1ª Vara Cível (exemplo)',
       className: 'Procedimento Comum Cível',
       subject: 'Indenização por Dano Moral',
       movements: [
