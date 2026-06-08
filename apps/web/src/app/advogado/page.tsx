@@ -145,8 +145,8 @@ export default function AdvogadoDashboard() {
         ))}
       </div>
 
-      {/* Consulta Datajud */}
-      <DatajudConsult onSaved={() => setSavedTick((t) => t + 1)} />
+      {/* Pesquisa jurídica (abas) */}
+      <ResearchPanel onSaved={() => setSavedTick((t) => t + 1)} />
 
       {/* Processos em acompanhamento (salvos) */}
       <FollowedProcesses reloadKey={savedTick} />
@@ -313,13 +313,10 @@ function DatajudConsult({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <section className="flex flex-col gap-4">
-      <div>
-        <h2 className="font-serif text-xl tracking-tightish">Consultar processo</h2>
-        <p className="text-sm text-muted-foreground">
-          Pesquise pelo número (Datajud). Você pode salvar para acompanhar ou descartar.
-        </p>
-      </div>
+    <div className="flex flex-col gap-4">
+      <p className="text-sm text-muted-foreground">
+        Pesquise pelo número (Datajud/CNJ). Você pode salvar para acompanhar ou descartar.
+      </p>
 
       <form onSubmit={consult} className="flex flex-wrap items-center gap-2">
         <Input
@@ -432,6 +429,90 @@ function DatajudConsult({ onSaved }: { onSaved: () => void }) {
           </Card>
         </div>
       )}
+    </div>
+  );
+}
+
+const RESEARCH_TABS = [
+  { key: 'processos', label: 'Processos' },
+  { key: 'jurisprudencia', label: 'Jurisprudência' },
+  { key: 'doutrina', label: 'Doutrina' },
+] as const;
+
+type ResearchTab = (typeof RESEARCH_TABS)[number]['key'];
+
+function ResearchPanel({ onSaved }: { onSaved: () => void }) {
+  const [tab, setTab] = useState<ResearchTab>('processos');
+  return (
+    <section className="flex flex-col gap-5">
+      <div>
+        <p className="text-xs uppercase tracking-[0.3em] text-accent/80">Pesquisa jurídica</p>
+        <h2 className="mt-2 font-serif text-2xl tracking-tightish">Consultar</h2>
+      </div>
+
+      {/* Abas (estilo JusBrasil) */}
+      <div className="flex gap-6 border-b border-border/60">
+        {RESEARCH_TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`-mb-px border-b-2 pb-3 text-sm transition-colors ${
+              tab === t.key
+                ? 'border-accent text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'processos' && <DatajudConsult onSaved={onSaved} />}
+      {tab === 'jurisprudencia' && (
+        <ResearchComingSoon
+          title="Jurisprudência"
+          placeholder="Buscar por tema, tribunal, relator…"
+          note="Em breve: busca de jurisprudência (acórdãos e decisões). Estamos conectando as fontes."
+        />
+      )}
+      {tab === 'doutrina' && (
+        <ResearchComingSoon
+          title="Doutrina"
+          placeholder="Buscar por autor, obra, assunto…"
+          note="Em breve: pesquisa de doutrina. Estamos conectando as fontes."
+        />
+      )}
     </section>
+  );
+}
+
+function ResearchComingSoon({
+  title,
+  placeholder,
+  note,
+}: {
+  title: string;
+  placeholder: string;
+  note: string;
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Input className="min-w-[260px] flex-1" placeholder={placeholder} disabled />
+        <Button disabled>Pesquisar</Button>
+      </div>
+      <Card className="border-dashed border-border/60 bg-card/40">
+        <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+          <span className="grid h-11 w-11 place-items-center rounded-full border border-accent/25 bg-accent/10 text-accent">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.3-4.3" />
+            </svg>
+          </span>
+          <p className="font-medium">{title}</p>
+          <p className="max-w-sm text-sm text-muted-foreground">{note}</p>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
