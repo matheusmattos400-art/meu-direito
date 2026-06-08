@@ -19,6 +19,8 @@ export const envSchema = z.object({
   SUPABASE_ANON_KEY: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   SUPABASE_STORAGE_BUCKET: z.string().optional().default('documents'),
+  // Chave da API Pública do Datajud (CNJ). Sem ela, a consulta opera em modo demo.
+  DATAJUD_API_KEY: z.string().optional(),
   // E-mails (separados por vírgula) promovidos a ADMIN no provisionamento.
   ADMIN_EMAILS: z.string().optional().default(''),
   // Atalho de autenticação SOMENTE para desenvolvimento (ignorado em produção).
