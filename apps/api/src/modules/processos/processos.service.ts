@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { simplifyMovement } from '@app/ai-core';
+import { explainMovement } from '../../common/datajud/movement-glossary';
 import type { ProcessMonitoring, User } from '@app/db';
 import type { AddProcessInput } from '@app/validation';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -75,10 +75,9 @@ export class ProcessosService {
       throw new BadRequestException('Número CNJ inválido — informe os 20 dígitos (NNNNNNN-DD.AAAA.J.TR.OOOO).');
     }
     const result = await this.datajud.fetchProcess(processNumber, court);
-    // Prévia usa o texto bruto; a simplificação por IA ocorre ao salvar/sincronizar.
     const movements = result.movements.map((m) => ({
       rawText: m.rawText,
-      simplifiedText: m.rawText,
+      explanation: explainMovement(m.rawText, m.cnjCode),
       occurredAt: m.occurredAt,
     }));
     movements.sort((a, b) => (b.occurredAt?.getTime?.() ?? 0) - (a.occurredAt?.getTime?.() ?? 0));
@@ -108,13 +107,12 @@ export class ProcessosService {
     for (const mov of result.movements) {
       const key = `${mov.cnjCode ?? ''}|${mov.rawText}`;
       if (seen.has(key)) continue;
-      const simplified = await simplifyMovement({ rawText: mov.rawText, cnjCode: mov.cnjCode ?? undefined });
       await this.prisma.processMovement.create({
         data: {
           monitoringId: monitoring.id,
           cnjCode: mov.cnjCode,
           rawText: mov.rawText,
-          simplifiedText: simplified.text,
+          simplifiedText: explainMovement(mov.rawText, mov.cnjCode),
           occurredAt: mov.occurredAt,
         },
       });

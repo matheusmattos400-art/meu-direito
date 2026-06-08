@@ -7,7 +7,7 @@ import { apiFetch } from '@/lib/api';
 
 interface Movement {
   rawText: string;
-  simplifiedText: string;
+  explanation: string;
   occurredAt: string | null;
 }
 interface Preview {
@@ -236,13 +236,16 @@ function DatajudConsult() {
             <div>
               <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Últimos andamentos</p>
               <ol className="relative flex flex-col gap-4 border-l border-border pl-4">
-                {result.movements.slice(0, 6).map((m, i) => (
+                {result.movements.slice(0, 8).map((m, i) => (
                   <li key={i} className="relative">
-                    <span className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-accent" aria-hidden />
-                    <p className="text-sm">{m.simplifiedText || m.rawText}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {m.occurredAt ? new Date(m.occurredAt).toLocaleDateString('pt-BR') : '—'}
-                    </p>
+                    <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-accent" aria-hidden />
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                      <p className="text-sm font-medium">{m.rawText}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {m.occurredAt ? new Date(m.occurredAt).toLocaleDateString('pt-BR') : '—'}
+                      </p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{m.explanation}</p>
                   </li>
                 ))}
                 {result.movements.length === 0 && (
