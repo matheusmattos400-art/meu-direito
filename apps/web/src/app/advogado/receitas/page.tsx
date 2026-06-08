@@ -65,9 +65,10 @@ export default function ReceitasPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="font-serif text-3xl tracking-tightish">Minhas receitas</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <header className="border-b border-border/60 pb-6">
+        <p className="text-xs uppercase tracking-[0.3em] text-accent/80">Financeiro</p>
+        <h1 className="mt-2 font-serif text-3xl tracking-tightish sm:text-4xl">Minhas receitas</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
           Seu controle financeiro pessoal — registre receitas e despesas. (Salvo neste navegador.)
         </p>
       </header>

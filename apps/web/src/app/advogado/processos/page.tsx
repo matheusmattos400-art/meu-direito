@@ -41,10 +41,11 @@ export default function ProcessosPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="font-serif text-3xl tracking-tightish">Processos</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Todos os processos acompanhados. Pesquise por número, assunto ou classe.
+      <header className="border-b border-border/60 pb-6">
+        <p className="text-xs uppercase tracking-[0.3em] text-accent/80">Acervo</p>
+        <h1 className="mt-2 font-serif text-3xl tracking-tightish sm:text-4xl">Processos</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Todos os processos acompanhados. Pesquise por parte, número, assunto ou vara.
         </p>
       </header>
 
@@ -69,7 +70,7 @@ export default function ProcessosPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {filtered.map((p) => (
-            <Card key={p.id} className="transition-colors hover:border-ring">
+            <Card key={p.id} className="border-border/60 bg-card/70 transition-colors hover:border-accent/40">
               <CardContent className="flex flex-col gap-2 py-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">

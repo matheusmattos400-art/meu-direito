@@ -53,10 +53,13 @@
   }
 }
 
-/* Tema escuro premium: brilho dourado quente e discreto, sem grade. */
+/* Textura tecnológica sutil no tema escuro (brilho radial + grade fina). */
 .dark body {
   background-image:
-    radial-gradient(75rem 55rem at 88% -12%, hsl(41 60% 58% / 0.05), transparent 60%),
-    radial-gradient(60rem 50rem at -8% 108%, hsl(41 40% 50% / 0.035), transparent 55%);
+    radial-gradient(60rem 60rem at 100% -10%, hsl(41 60% 58% / 0.06), transparent 55%),
+    radial-gradient(50rem 50rem at -10% 0%, hsl(220 60% 60% / 0.05), transparent 50%),
+    linear-gradient(hsl(0 0% 100% / 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(0 0% 100% / 0.015) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 44px 44px, 44px 44px;
   background-attachment: fixed;
 }

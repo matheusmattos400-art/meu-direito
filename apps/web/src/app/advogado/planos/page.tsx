@@ -106,9 +106,10 @@ export default function PlanosPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <header>
-        <h1 className="font-serif text-3xl tracking-tightish">Meu plano</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <header className="border-b border-border/60 pb-6">
+        <p className="text-xs uppercase tracking-[0.3em] text-accent/80">Assinatura</p>
+        <h1 className="mt-2 font-serif text-3xl tracking-tightish sm:text-4xl">Meu plano</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
           Escolha um combo pronto ou monte o seu somando áreas. Você atende apenas os casos das áreas
           que assinar e pode trocar quando quiser.
         </p>
