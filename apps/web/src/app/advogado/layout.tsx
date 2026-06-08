@@ -9,15 +9,18 @@ export default function AdvogadoLayout({ children }: { children: React.ReactNode
           <Link href="/advogado" className="font-serif text-lg tracking-tightish">
             Workspace
           </Link>
-          <nav className="flex items-center gap-6 text-sm text-muted-foreground">
-            <Link href="/advogado/cadastro" className="hover:text-foreground">
-              Cadastro
+          <nav className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground">
+            <Link href="/advogado" className="hover:text-foreground">
+              Painel
             </Link>
             <Link href="/advogado/oportunidades" className="hover:text-foreground">
-              Oportunidades
+              Chamadas
             </Link>
-            <Link href="/advogado/casos" className="hover:text-foreground">
-              Meus casos
+            <Link href="/advogado/processos" className="hover:text-foreground">
+              Processos
+            </Link>
+            <Link href="/advogado/receitas" className="hover:text-foreground">
+              Minhas receitas
             </Link>
             <Link href="/advogado/planos" className="hover:text-foreground">
               Planos

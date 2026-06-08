@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { User } from '@app/db';
 import { addProcessSchema, type AddProcessInput } from '@app/validation';
@@ -25,6 +25,12 @@ export class ProcessosController {
     @Body(new ZodValidationPipe(addProcessSchema)) dto: AddProcessInput,
   ) {
     return this.processos.add(user, dto).then((data) => ({ data }));
+  }
+
+  @Get('preview')
+  @ApiOperation({ summary: 'Consulta um processo no Datajud sem salvar (prévia da busca).' })
+  preview(@Query('number') number: string, @Query('court') court?: string) {
+    return this.processos.preview(number, court).then((data) => ({ data }));
   }
 
   @Get(':id')

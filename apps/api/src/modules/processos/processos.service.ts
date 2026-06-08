@@ -68,6 +68,25 @@ export class ProcessosService {
     };
   }
 
+  /** Consulta um processo no Datajud SEM salvar (prévia para a busca do advogado). */
+  async preview(processNumber: string, court?: string) {
+    const result = await this.datajud.fetchProcess(processNumber, court);
+    // Prévia usa o texto bruto; a simplificação por IA ocorre ao salvar/sincronizar.
+    const movements = result.movements.map((m) => ({
+      rawText: m.rawText,
+      simplifiedText: m.rawText,
+      occurredAt: m.occurredAt,
+    }));
+    movements.sort((a, b) => (b.occurredAt?.getTime?.() ?? 0) - (a.occurredAt?.getTime?.() ?? 0));
+    return {
+      processNumber,
+      court: court ?? result.court ?? null,
+      className: result.className ?? null,
+      subject: result.subject ?? null,
+      movements,
+    };
+  }
+
   /** Busca movimentos no Datajud e traduz os novos para linguagem simples. */
   async sync(user: User, id: string) {
     const monitoring = await this.loadOwned(user, id);
