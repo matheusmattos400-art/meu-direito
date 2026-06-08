@@ -20,6 +20,7 @@ import { ConsentModule } from './modules/consent/consent.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { PecasModule } from './modules/pecas/pecas.module';
 import { ProcessosModule } from './modules/processos/processos.module';
+import { JulgadosModule } from './modules/julgados/julgados.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
@@ -49,6 +50,7 @@ import { HealthController } from './health.controller';
     DocumentsModule,
     PecasModule,
     ProcessosModule,
+    JulgadosModule,
     BillingModule,
     KnowledgeModule,
     CatalogModule,

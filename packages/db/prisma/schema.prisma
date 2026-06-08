@@ -584,6 +584,33 @@ model PlanArea {
   @@map("plan_areas")
 }
 
+// ----------------------- JURISPRUDÊNCIA (Dados Abertos) -----------------------
+// Julgados indexados a partir de fontes oficiais de dados abertos (ex.: STJ).
+// Busca full-text (Postgres) sobre `searchText`. Conteúdo público e gratuito.
+model Julgado {
+  id            String    @id @default(uuid())
+  source        String // 'STJ', 'STF', …
+  sourceId      String // id no tribunal de origem
+  court         String // sigla do tribunal (STJ)
+  processNumber String?
+  classe        String?
+  orgaoJulgador String?
+  relator       String?
+  publishedAt   DateTime?
+  decidedAt     DateTime?
+  ementa        String
+  tese          String?
+  tema          String?
+  url           String?
+  searchText    String // ementa + tese + tema + classe + relator (para FTS)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([source, sourceId])
+  @@index([court, publishedAt])
+  @@map("julgados")
+}
+
 // ----------------------- CONSENTIMENTO (LGPD) -----------------------
 model ConsentTerm {
   id          String          @id @default(uuid())

@@ -435,8 +435,7 @@ function DatajudConsult({ onSaved }: { onSaved: () => void }) {
 
 const RESEARCH_TABS = [
   { key: 'processos', label: 'Processos' },
-  { key: 'jurisprudencia', label: 'Jurisprudência' },
-  { key: 'doutrina', label: 'Doutrina' },
+  { key: 'julgados', label: 'Julgados' },
 ] as const;
 
 type ResearchTab = (typeof RESEARCH_TABS)[number]['key'];
@@ -468,85 +467,150 @@ function ResearchPanel({ onSaved }: { onSaved: () => void }) {
       </div>
 
       {tab === 'processos' && <DatajudConsult onSaved={onSaved} />}
-      {tab === 'jurisprudencia' && <JurisprudenciaSearch />}
-      {tab === 'doutrina' && (
-        <ResearchComingSoon
-          title="Doutrina"
-          placeholder="Buscar por autor, obra, assunto…"
-          note="Em breve: pesquisa de doutrina. Estamos conectando as fontes."
-        />
-      )}
+      {tab === 'julgados' && <JulgadosSearch />}
     </section>
   );
 }
 
-const JURIS_SOURCES = [
-  { key: 'stf', label: 'STF', url: (q: string) => `https://jurisprudencia.stf.jus.br/pages/search?base=acordaos&queryString=${encodeURIComponent(q)}` },
-  { key: 'stj', label: 'STJ', url: (q: string) => `https://scon.stj.jus.br/SCON/pesquisar.jsp?b=ACOR&livre=${encodeURIComponent(q)}` },
-  { key: 'lexml', label: 'LexML', url: (q: string) => `https://www.lexml.gov.br/busca/search?keyword=${encodeURIComponent(q)}` },
-] as const;
+interface Julgado {
+  id: string;
+  court: string;
+  processNumber: string | null;
+  classe: string | null;
+  orgaoJulgador: string | null;
+  relator: string | null;
+  publishedAt: string | null;
+  ementa: string;
+  tese: string | null;
+  tema: string | null;
+  url: string | null;
+}
 
-function JurisprudenciaSearch() {
+function JulgadosSearch() {
   const [q, setQ] = useState('');
+  const [courts, setCourts] = useState<Array<{ court: string; count: number }>>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [items, setItems] = useState<Julgado[]>([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [searched, setSearched] = useState(false);
 
-  function open(url: (q: string) => string) {
+  useEffect(() => {
+    apiFetch<Array<{ court: string; count: number }>>('/julgados/courts').then(setCourts).catch(() => {});
+  }, []);
+
+  async function run(p: number) {
     if (!q.trim()) return;
-    window.open(url(q.trim()), '_blank', 'noopener,noreferrer');
+    setBusy(true);
+    setSearched(true);
+    try {
+      const qs = new URLSearchParams({ q: q.trim(), page: String(p) });
+      if (selected.size) qs.set('courts', [...selected].join(','));
+      const r = await apiFetch<{ items: Julgado[]; hasMore: boolean; page: number }>(`/julgados?${qs}`);
+      setItems(r.items);
+      setHasMore(r.hasMore);
+      setPage(p);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function toggleCourt(c: string) {
+    setSelected((s) => {
+      const n = new Set(s);
+      n.has(c) ? n.delete(c) : n.add(c);
+      return n;
+    });
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <Input
-        placeholder="Tema, tese, relator ou nº do julgado…"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && open(JURIS_SOURCES[0].url)}
-      />
-      <div className="flex flex-wrap gap-2">
-        {JURIS_SOURCES.map((s) => (
-          <Button key={s.key} variant="outline" disabled={!q.trim()} onClick={() => open(s.url)}>
-            Buscar no {s.label} ↗
-          </Button>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          run(0);
+        }}
+        className="flex flex-wrap items-center gap-2"
+      >
+        <Input
+          className="min-w-[260px] flex-1"
+          placeholder="Tema, tese, expressão… (ex.: dano moral consumidor)"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <Button type="submit" disabled={busy || !q.trim()}>
+          {busy ? <Spinner /> : 'Pesquisar'}
+        </Button>
+      </form>
+
+      {courts.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">Tribunais:</span>
+          {courts.map((c) => (
+            <button
+              key={c.court}
+              type="button"
+              onClick={() => toggleCourt(c.court)}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                selected.has(c.court)
+                  ? 'border-accent bg-accent/15 text-foreground'
+                  : 'border-border text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              {c.court} <span className="opacity-60">({c.count})</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {searched && !busy && items.length === 0 && (
+        <p className="text-sm text-muted-foreground">Nenhum julgado encontrado para esse termo.</p>
+      )}
+
+      <div className="flex flex-col gap-3">
+        {items.map((j) => (
+          <Card key={j.id} className="border-border/60 bg-card/70">
+            <CardContent className="flex flex-col gap-2 pt-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-medium">
+                  {j.classe ?? 'Acórdão'} {j.processNumber ? `· ${j.processNumber}` : ''}
+                </span>
+                <Badge variant="neutral">{j.court}</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {[j.relator, j.orgaoJulgador, j.publishedAt ? new Date(j.publishedAt).toLocaleDateString('pt-BR') : null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+              {j.tema && <p className="text-xs text-accent">Tema: {j.tema}</p>}
+              <p className="whitespace-pre-line text-sm text-muted-foreground">{j.ementa}</p>
+              {j.url && (
+                <a href={j.url} target="_blank" rel="noreferrer" className="text-sm text-accent hover:underline">
+                  Ver no tribunal ↗
+                </a>
+              )}
+            </CardContent>
+          </Card>
         ))}
       </div>
-      <Card className="border-dashed border-border/60 bg-card/40">
-        <CardContent className="py-6 text-sm text-muted-foreground">
-          A busca abre o resultado na fonte <strong>oficial</strong> (STF, STJ ou LexML) — gratuita e
-          confiável. Resultados <strong>dentro do app</strong> (inteiro teor inline) dependem de uma
-          API paga de jurisprudência — posso integrar quando você quiser.
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
-function ResearchComingSoon({
-  title,
-  placeholder,
-  note,
-}: {
-  title: string;
-  placeholder: string;
-  note: string;
-}) {
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Input className="min-w-[260px] flex-1" placeholder={placeholder} disabled />
-        <Button disabled>Pesquisar</Button>
-      </div>
-      <Card className="border-dashed border-border/60 bg-card/40">
-        <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
-          <span className="grid h-11 w-11 place-items-center rounded-full border border-accent/25 bg-accent/10 text-accent">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M21 21l-4.3-4.3" />
-            </svg>
-          </span>
-          <p className="font-medium">{title}</p>
-          <p className="max-w-sm text-sm text-muted-foreground">{note}</p>
-        </CardContent>
-      </Card>
+      {(items.length > 0 || page > 0) && (
+        <div className="flex items-center justify-between border-t border-border/60 pt-4">
+          <Button variant="outline" size="sm" disabled={busy || page === 0} onClick={() => run(page - 1)}>
+            ← Anterior
+          </Button>
+          <span className="text-sm text-muted-foreground">Página {page + 1}</span>
+          <Button variant="outline" size="sm" disabled={busy || !hasMore} onClick={() => run(page + 1)}>
+            Próxima →
+          </Button>
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground">
+        Fonte: Dados Abertos oficiais (STJ). Gratuito. Mais tribunais serão adicionados conforme as
+        bases públicas.
+      </p>
     </div>
   );
 }
