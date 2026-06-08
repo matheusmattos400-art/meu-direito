@@ -116,7 +116,7 @@ export default function AdvogadoDashboard() {
       {/* Carrossel de informações principais */}
       <div
         ref={trackRef}
-        className="-mx-1 flex snap-x snap-mandatory gap-5 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="-mx-2 flex snap-x snap-mandatory gap-5 overflow-x-auto px-2 pb-8 pt-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {CARDS.map((card) => (
           <Link key={card.key} href={card.href} className="group min-w-[250px] snap-start sm:min-w-[280px]">
