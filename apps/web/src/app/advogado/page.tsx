@@ -468,13 +468,7 @@ function ResearchPanel({ onSaved }: { onSaved: () => void }) {
       </div>
 
       {tab === 'processos' && <DatajudConsult onSaved={onSaved} />}
-      {tab === 'jurisprudencia' && (
-        <ResearchComingSoon
-          title="Jurisprudência"
-          placeholder="Buscar por tema, tribunal, relator…"
-          note="Em breve: busca de jurisprudência (acórdãos e decisões). Estamos conectando as fontes."
-        />
-      )}
+      {tab === 'jurisprudencia' && <JurisprudenciaSearch />}
       {tab === 'doutrina' && (
         <ResearchComingSoon
           title="Doutrina"
@@ -483,6 +477,46 @@ function ResearchPanel({ onSaved }: { onSaved: () => void }) {
         />
       )}
     </section>
+  );
+}
+
+const JURIS_SOURCES = [
+  { key: 'stf', label: 'STF', url: (q: string) => `https://jurisprudencia.stf.jus.br/pages/search?base=acordaos&queryString=${encodeURIComponent(q)}` },
+  { key: 'stj', label: 'STJ', url: (q: string) => `https://scon.stj.jus.br/SCON/pesquisar.jsp?b=ACOR&livre=${encodeURIComponent(q)}` },
+  { key: 'lexml', label: 'LexML', url: (q: string) => `https://www.lexml.gov.br/busca/search?keyword=${encodeURIComponent(q)}` },
+] as const;
+
+function JurisprudenciaSearch() {
+  const [q, setQ] = useState('');
+
+  function open(url: (q: string) => string) {
+    if (!q.trim()) return;
+    window.open(url(q.trim()), '_blank', 'noopener,noreferrer');
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Input
+        placeholder="Tema, tese, relator ou nº do julgado…"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && open(JURIS_SOURCES[0].url)}
+      />
+      <div className="flex flex-wrap gap-2">
+        {JURIS_SOURCES.map((s) => (
+          <Button key={s.key} variant="outline" disabled={!q.trim()} onClick={() => open(s.url)}>
+            Buscar no {s.label} ↗
+          </Button>
+        ))}
+      </div>
+      <Card className="border-dashed border-border/60 bg-card/40">
+        <CardContent className="py-6 text-sm text-muted-foreground">
+          A busca abre o resultado na fonte <strong>oficial</strong> (STF, STJ ou LexML) — gratuita e
+          confiável. Resultados <strong>dentro do app</strong> (inteiro teor inline) dependem de uma
+          API paga de jurisprudência — posso integrar quando você quiser.
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
