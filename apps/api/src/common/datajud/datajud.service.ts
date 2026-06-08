@@ -41,10 +41,11 @@ export class DatajudService {
       return this.mockProcess(processNumber, court);
     }
 
-    const alias = this.resolveAlias(court);
+    // Resolve o tribunal pelo número CNJ (preferencial) ou pela sigla informada.
+    const alias = this.resolveAliasFromNumber(processNumber) ?? this.resolveAlias(court);
     if (!alias) {
-      this.logger.warn(`Alias do tribunal não resolvido (court=${court}); usando mock.`);
-      return this.mockProcess(processNumber, court);
+      this.logger.warn(`Tribunal não resolvido para ${processNumber} (court=${court}).`);
+      return { court: court ?? null, className: null, subject: null, movements: [] };
     }
 
     const apiKey = this.config.get<string>('DATAJUD_API_KEY');
@@ -93,17 +94,44 @@ export class DatajudService {
 
   private resolveAlias(court?: string): string | null {
     if (!court) return null;
-    const c = court.toLowerCase();
-    // Aceita o alias direto, ou mapeia siglas comuns.
+    const c = court.toLowerCase().replace(/[^a-z0-9_]/g, '');
     if (c.startsWith('api_publica_')) return c;
-    const map: Record<string, string> = {
-      tjsp: 'api_publica_tjsp',
-      tjrj: 'api_publica_tjrj',
-      tjmg: 'api_publica_tjmg',
-      trf1: 'api_publica_trf1',
-      trf3: 'api_publica_trf3',
-    };
-    return map[c] ?? null;
+    // Siglas comuns: tjsp, trf1, trt2, tre_sp, stj…
+    if (/^(tj|trt|trf|tre|tjm)[a-z0-9_]+$/.test(c) || c === 'stj' || c === 'tst' || c === 'tse') {
+      return `api_publica_${c}`;
+    }
+    return null;
+  }
+
+  // TR (01..27) -> UF, conforme tabela CNJ (Justiça Estadual e Eleitoral).
+  private static readonly UF_BY_TR = [
+    '', 'ac', 'al', 'ap', 'am', 'ba', 'ce', 'df', 'es', 'go', 'ma', 'mt', 'ms', 'mg',
+    'pa', 'pb', 'pr', 'pe', 'pi', 'rj', 'rn', 'rs', 'ro', 'rr', 'sc', 'se', 'sp', 'to',
+  ];
+
+  /**
+   * Deriva o índice (alias) do tribunal a partir do número CNJ
+   * (NNNNNNN-DD.AAAA.J.TR.OOOO): J = segmento, TR = tribunal.
+   */
+  private resolveAliasFromNumber(processNumber: string): string | null {
+    const d = processNumber.replace(/\D/g, '');
+    if (d.length !== 20) return null;
+    const segment = d[13];
+    const tr = Number(d.slice(14, 16));
+    switch (segment) {
+      case '8': // Justiça Estadual
+        return DatajudService.UF_BY_TR[tr] ? `api_publica_tj${DatajudService.UF_BY_TR[tr]}` : null;
+      case '4': // Justiça Federal (TRF1..TRF6)
+        return tr >= 1 && tr <= 6 ? `api_publica_trf${tr}` : null;
+      case '5': // Justiça do Trabalho (TRT1..TRT24)
+        return tr >= 1 && tr <= 24 ? `api_publica_trt${tr}` : null;
+      case '6': // Justiça Eleitoral (TRE por UF)
+        return DatajudService.UF_BY_TR[tr] ? `api_publica_tre_${DatajudService.UF_BY_TR[tr]}` : null;
+      case '3': // STJ
+        return 'api_publica_stj';
+      default:
+        return null;
+    }
   }
 
   // ---------------- mock ----------------

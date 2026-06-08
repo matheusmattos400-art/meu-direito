@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { simplifyMovement } from '@app/ai-core';
 import type { ProcessMonitoring, User } from '@app/db';
 import type { AddProcessInput } from '@app/validation';
@@ -70,6 +70,10 @@ export class ProcessosService {
 
   /** Consulta um processo no Datajud SEM salvar (prévia para a busca do advogado). */
   async preview(processNumber: string, court?: string) {
+    const digits = (processNumber ?? '').replace(/\D/g, '');
+    if (digits.length !== 20) {
+      throw new BadRequestException('Número CNJ inválido — informe os 20 dígitos (NNNNNNN-DD.AAAA.J.TR.OOOO).');
+    }
     const result = await this.datajud.fetchProcess(processNumber, court);
     // Prévia usa o texto bruto; a simplificação por IA ocorre ao salvar/sincronizar.
     const movements = result.movements.map((m) => ({
@@ -84,6 +88,8 @@ export class ProcessosService {
       className: result.className ?? null,
       subject: result.subject ?? null,
       movements,
+      demo: this.datajud.isMock(), // true = dados de exemplo (sem chave do Datajud)
+      found: result.className != null || movements.length > 0,
     };
   }
 

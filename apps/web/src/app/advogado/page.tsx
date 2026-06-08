@@ -16,6 +16,8 @@ interface Preview {
   className: string | null;
   subject: string | null;
   movements: Movement[];
+  demo: boolean;
+  found: boolean;
 }
 
 const CARDS = [
@@ -205,7 +207,20 @@ function DatajudConsult() {
 
       {error && <p className="text-sm text-accent">{error}</p>}
 
-      {result && (
+      {result && result.demo && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+          ⚠️ <strong>Modo demonstração:</strong> a consulta ao Datajud ainda não está conectada (falta a
+          chave da API pública do CNJ). Os dados abaixo são de <strong>exemplo</strong>, não do processo real.
+        </div>
+      )}
+
+      {result && !result.demo && !result.found && (
+        <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          Nenhum processo encontrado para este número no Datajud. Confira o número (20 dígitos) e o tribunal.
+        </div>
+      )}
+
+      {result && (result.demo || result.found) && (
         <Card>
           <CardContent className="flex flex-col gap-4 pt-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
