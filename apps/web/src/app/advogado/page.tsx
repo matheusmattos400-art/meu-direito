@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Badge, Button, Card, CardContent, Input, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
+import { useMe } from '@/lib/use-me';
 
 interface Movement {
   rawText: string;
@@ -52,10 +53,27 @@ const CARDS = [
   },
 ] as const;
 
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Bom dia';
+  if (h < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
+function firstName(full?: string | null): string {
+  if (!full) return 'Advogado(a)';
+  const parts = full.trim().split(/\s+/);
+  // mantém prefixo "Dr."/"Dra." + primeiro nome
+  if (/^dr?a?\.?$/i.test(parts[0] ?? '')) return `${parts[0]} ${parts[1] ?? ''}`.trim();
+  return parts[0] ?? full;
+}
+
 export default function AdvogadoDashboard() {
+  const { me } = useMe();
   const [counts, setCounts] = useState<Record<string, number | undefined>>({});
   const [savedTick, setSavedTick] = useState(0);
   const trackRef = useRef<HTMLDivElement>(null);
+  const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
 
   useEffect(() => {
     apiFetch<unknown[]>('/opportunities')
@@ -79,40 +97,48 @@ export default function AdvogadoDashboard() {
 
   return (
     <div className="flex flex-col gap-10">
-      <header className="flex items-end justify-between gap-4">
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border/60 pb-8">
         <div>
-          <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Workspace</p>
-          <h1 className="mt-1 font-serif text-4xl tracking-tightish">Seu painel</h1>
+          <p className="text-xs uppercase tracking-[0.3em] text-accent/80">{today}</p>
+          <h1 className="mt-2 font-serif text-4xl leading-tight tracking-tightish sm:text-5xl">
+            {greeting()}, <span className="text-accent">{firstName(me?.fullName)}</span>.
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Aqui está o panorama do seu escritório hoje.
+          </p>
         </div>
         <div className="hidden gap-2 sm:flex">
-          <button onClick={() => scroll(-1)} className="grid h-9 w-9 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Anterior">‹</button>
-          <button onClick={() => scroll(1)} className="grid h-9 w-9 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Próximo">›</button>
+          <button onClick={() => scroll(-1)} className="grid h-10 w-10 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:border-accent/40 hover:text-foreground" aria-label="Anterior">‹</button>
+          <button onClick={() => scroll(1)} className="grid h-10 w-10 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:border-accent/40 hover:text-foreground" aria-label="Próximo">›</button>
         </div>
       </header>
 
       {/* Carrossel de informações principais */}
       <div
         ref={trackRef}
-        className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="-mx-1 flex snap-x snap-mandatory gap-5 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {CARDS.map((card) => (
-          <Link key={card.key} href={card.href} className="min-w-[260px] snap-start sm:min-w-[300px]">
-            <Card className="group h-full overflow-hidden transition-colors hover:border-ring">
-              <CardContent className="relative flex h-full flex-col justify-between gap-6 pt-6">
-                <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-accent/5 transition-colors group-hover:bg-accent/10" aria-hidden />
-                <div className="flex items-start justify-between">
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="text-accent">
-                    <path d={card.icon} />
-                  </svg>
-                  <span className="text-2xl text-muted-foreground transition-transform group-hover:translate-x-1">→</span>
+          <Link key={card.key} href={card.href} className="group min-w-[250px] snap-start sm:min-w-[280px]">
+            <Card className="h-full border-border/60 bg-card/70 backdrop-blur-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:border-accent/40 group-hover:shadow-[0_18px_40px_-24px_hsl(41_60%_58%/0.45)]">
+              <CardContent className="flex h-full flex-col gap-8 pt-7">
+                <div className="flex items-center justify-between">
+                  <span className="grid h-11 w-11 place-items-center rounded-full border border-accent/25 bg-accent/10 text-accent">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <path d={card.icon} />
+                    </svg>
+                  </span>
+                  <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">{card.title}</span>
                 </div>
-                <div>
-                  <p className="font-serif text-5xl tracking-tightish tabular-nums">
-                    {counts[card.key] === undefined ? '—' : counts[card.key]}
+                <div className="mt-auto">
+                  <p className="font-serif text-5xl tracking-tightish tabular-nums text-accent">
+                    {counts[card.key] === undefined ? '·' : counts[card.key]}
                   </p>
-                  <p className="mt-2 font-medium">{card.title}</p>
-                  <p className="text-sm text-muted-foreground">{card.subtitle}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{card.subtitle}</p>
                 </div>
+                <span className="text-sm text-muted-foreground transition-colors group-hover:text-foreground">
+                  Abrir <span className="transition-transform group-hover:translate-x-0.5">→</span>
+                </span>
               </CardContent>
             </Card>
           </Link>
