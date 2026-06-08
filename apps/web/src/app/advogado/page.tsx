@@ -254,6 +254,11 @@ function DatajudConsult() {
               </ol>
             </div>
 
+            <p className="text-xs text-muted-foreground">
+              Fonte: Datajud/CNJ (base oficial). Reúne todas as instâncias (1º e 2º graus). Pode haver
+              pequena defasagem em relação a agregadores privados.
+            </p>
+
             <Button onClick={saveFollow} disabled={saving} className="self-start">
               {saving ? <Spinner /> : 'Salvar para acompanhar'}
             </Button>

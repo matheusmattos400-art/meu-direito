@@ -56,6 +56,7 @@ export class DatajudService {
         Authorization: `APIKey ${apiKey}`,
       },
       body: JSON.stringify({
+        size: 50,
         query: { match: { numeroProcesso: processNumber.replace(/\D/g, '') } },
       }),
     });
@@ -70,26 +71,42 @@ export class DatajudService {
 
   // ---------------- parsing ----------------
   private parseResponse(body: unknown, court?: string): DatajudProcess {
-    const hits = (body as { hits?: { hits?: Array<{ _source?: Record<string, unknown> }> } })?.hits
-      ?.hits;
-    const source = hits?.[0]?._source ?? {};
-    const movimentos = Array.isArray(source['movimentos'])
-      ? (source['movimentos'] as Array<Record<string, unknown>>)
-      : [];
+    const hits =
+      (body as { hits?: { hits?: Array<{ _source?: Record<string, unknown> }> } })?.hits?.hits ?? [];
 
-    return {
-      court: (source['tribunal'] as string) ?? court ?? null,
-      className: (source['classe'] as { nome?: string })?.nome ?? null,
-      subject:
+    let className: string | null = null;
+    let subject: string | null = null;
+    let tribunal: string | null = null;
+    const movements: DatajudMovement[] = [];
+    const seen = new Set<string>();
+
+    // O Datajud retorna um registro por instância (G1, G2…). Mesclamos os
+    // movimentos de todas para montar a linha do tempo completa.
+    for (const h of hits) {
+      const source = h._source ?? {};
+      tribunal = tribunal ?? ((source['tribunal'] as string) ?? null);
+      className = className ?? ((source['classe'] as { nome?: string })?.nome ?? null);
+      subject =
+        subject ??
         (Array.isArray(source['assuntos'])
           ? ((source['assuntos'] as Array<{ nome?: string }>)[0]?.nome ?? null)
-          : null) ?? null,
-      movements: movimentos.map((m) => ({
-        cnjCode: m['codigo'] != null ? String(m['codigo']) : null,
-        rawText: String(m['nome'] ?? ''),
-        occurredAt: m['dataHora'] ? new Date(String(m['dataHora'])) : null,
-      })),
-    };
+          : null);
+
+      const movimentos = Array.isArray(source['movimentos'])
+        ? (source['movimentos'] as Array<Record<string, unknown>>)
+        : [];
+      for (const m of movimentos) {
+        const cnjCode = m['codigo'] != null ? String(m['codigo']) : null;
+        const rawText = String(m['nome'] ?? '');
+        const occurredAt = m['dataHora'] ? new Date(String(m['dataHora'])) : null;
+        const key = `${cnjCode ?? ''}|${rawText}|${occurredAt?.toISOString() ?? ''}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        movements.push({ cnjCode, rawText, occurredAt });
+      }
+    }
+
+    return { court: tribunal ?? court ?? null, className, subject, movements };
   }
 
   private resolveAlias(court?: string): string | null {
