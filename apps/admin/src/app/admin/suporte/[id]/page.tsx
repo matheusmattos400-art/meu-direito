@@ -179,6 +179,7 @@ export default function AdminTicketPage() {
 
   if (!thread) return <Spinner className="text-muted-foreground" />;
   const st = STATUS_META[thread.status];
+  const isAccessCategory = !!thread.category && SYSTEM_CATEGORY_CODES.includes(thread.category);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -269,26 +270,45 @@ export default function AdminTicketPage() {
         </div>
       </div>
 
-      {/* Painel lateral — depende de quem abriu o chamado */}
+      {/* Painel lateral — depende de quem abriu o chamado e da categoria */}
       <aside>
         {thread.requesterRole === 'LAWYER' ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Acesso do advogado</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <p className="text-sm text-muted-foreground">
-                Libere o acesso do advogado (ex.: perdeu o acesso por um problema, mesmo pagando).
-              </p>
-              <div className="flex gap-2">
-                {[7, 30, 60].map((d) => (
-                  <Button key={d} size="sm" variant="outline" disabled={busy} onClick={() => grantAccess(d)}>
-                    {d} dias
+          isAccessCategory ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Acesso do advogado</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3">
+                <p className="text-sm text-muted-foreground">
+                  Libere o acesso do advogado (ex.: perdeu o acesso por um problema, mesmo pagando).
+                </p>
+                <div className="flex gap-2">
+                  {[7, 30, 60].map((d) => (
+                    <Button key={d} size="sm" variant="outline" disabled={busy} onClick={() => grantAccess(d)}>
+                      {d} dias
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Atendimento</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
+                <p>
+                  {thread.category ? CAT_LABEL[thread.category] ?? thread.category : 'Chamado'} — não há ação
+                  automática para esta categoria. Responda pelo chat e, ao concluir, marque como resolvido.
+                </p>
+                {thread.status !== 'RESOLVED' && (
+                  <Button size="sm" variant="accent" disabled={busy} onClick={() => setStatus('RESOLVED')} className="self-start">
+                    Marcar como resolvido
                   </Button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+          )
         ) : (
           <Card>
             <CardHeader>
