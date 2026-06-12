@@ -162,11 +162,20 @@ export const createPlanSchema = z.object({
   name: z.string().min(2).max(60),
   priceBRL: z.coerce.number().nonnegative('Preço inválido.'),
   casesPerMonth: z.coerce.number().int().nonnegative().default(0),
-  // Áreas (categorias) incluídas no combo.
+  // Áreas inteiras (todos os sub-temas) incluídas no combo.
   areaIds: z.array(z.string().uuid()).default([]),
+  // Sub-temas específicos incluídos no combo.
+  subcategoryIds: z.array(z.string().uuid()).default([]),
   highlights: z.array(z.string().max(80)).max(8).default([]),
 });
 export type CreatePlanInput = z.infer<typeof createPlanSchema>;
+
+/** Criação de um sub-tema dentro de uma área (ex.: Família em Direito Civil). */
+export const createSubareaSchema = z.object({
+  categoryId: z.string().uuid(),
+  name: z.string().min(2).max(60),
+});
+export type CreateSubareaInput = z.infer<typeof createSubareaSchema>;
 
 /** Edição de um plano combo existente (campos opcionais). */
 export const updatePlanSchema = z.object({
@@ -174,6 +183,7 @@ export const updatePlanSchema = z.object({
   priceBRL: z.coerce.number().nonnegative('Preço inválido.').optional(),
   casesPerMonth: z.coerce.number().int().nonnegative().optional(),
   areaIds: z.array(z.string().uuid()).optional(),
+  subcategoryIds: z.array(z.string().uuid()).optional(),
   highlights: z.array(z.string().max(80)).max(8).optional(),
   active: z.boolean().optional(),
 });

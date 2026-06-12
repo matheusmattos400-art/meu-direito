@@ -262,8 +262,12 @@ model Subcategory {
   slug       String
   name       String
   active     Boolean  @default(true)
+  // Sub-tema cobrável: preço mensal próprio (ex.: Família, Sucessões…).
+  monthlyPriceBRL Decimal? @db.Decimal(12, 2)
+  billable        Boolean  @default(false)
 
-  cases Case[]
+  cases             Case[]
+  planSubcategories PlanSubcategory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -567,12 +571,13 @@ model Plan {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  planAreas PlanArea[]
+  planAreas         PlanArea[]
+  planSubcategories PlanSubcategory[]
 
   @@map("plans")
 }
 
-// Áreas incluídas em um plano combo.
+// Áreas incluídas em um plano combo (área inteira = todos os sub-temas).
 model PlanArea {
   id         String   @id @default(uuid())
   planId     String
@@ -582,6 +587,18 @@ model PlanArea {
 
   @@unique([planId, categoryId])
   @@map("plan_areas")
+}
+
+// Sub-temas específicos incluídos em um plano combo.
+model PlanSubcategory {
+  id            String      @id @default(uuid())
+  planId        String
+  plan          Plan        @relation(fields: [planId], references: [id], onDelete: Cascade)
+  subcategoryId String
+  subcategory   Subcategory @relation(fields: [subcategoryId], references: [id])
+
+  @@unique([planId, subcategoryId])
+  @@map("plan_subcategories")
 }
 
 // ----------------------- JURISPRUDÊNCIA (Dados Abertos) -----------------------

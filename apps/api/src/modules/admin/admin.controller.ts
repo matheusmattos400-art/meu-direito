@@ -6,6 +6,7 @@ import {
   areaPriceSchema,
   createAdminSchema,
   createPlanSchema,
+  createSubareaSchema,
   rejectLawyerSchema,
   setAdminScopesSchema,
   updatePlanSchema,
@@ -13,6 +14,7 @@ import {
   type AreaPriceInput,
   type CreateAdminInput,
   type CreatePlanInput,
+  type CreateSubareaInput,
   type RejectLawyerInput,
   type SetAdminScopesInput,
   type UpdatePlanInput,
@@ -133,6 +135,34 @@ export class AdminController {
     @Body(new ZodValidationPipe(areaPriceSchema)) dto: AreaPriceInput,
   ) {
     return this.admin.setAreaPrice(user, id, dto.priceBRL, dto.billable).then((data) => ({ data }));
+  }
+
+  @Post('subareas')
+  @RequireScope('FINANCEIRO')
+  @ApiOperation({ summary: 'Cria um sub-tema dentro de uma área (ex.: Família em Direito Civil).' })
+  createSubarea(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(createSubareaSchema)) dto: CreateSubareaInput,
+  ) {
+    return this.admin.createSubarea(user, dto.categoryId, dto.name).then((data) => ({ data }));
+  }
+
+  @Post('subareas/:id/price')
+  @RequireScope('FINANCEIRO')
+  @ApiOperation({ summary: 'Define o preço mensal de um sub-tema.' })
+  setSubareaPrice(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(areaPriceSchema)) dto: AreaPriceInput,
+  ) {
+    return this.admin.setSubareaPrice(user, id, dto.priceBRL, dto.billable).then((data) => ({ data }));
+  }
+
+  @Delete('subareas/:id')
+  @RequireScope('FINANCEIRO')
+  @ApiOperation({ summary: 'Remove um sub-tema.' })
+  deleteSubarea(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.admin.deleteSubarea(user, id).then((data) => ({ data }));
   }
 
   @Get('lawyers/:lawyerId')

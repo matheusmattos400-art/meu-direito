@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Spinner, cn } from '@app/ui';
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Spinner, cn } from '@app/ui';
 import { apiFetch } from '@/lib/api';
 
 interface Finance {
@@ -24,14 +24,6 @@ interface Finance {
 }
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-const PAYMENT_STATUS: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'neutral' }> = {
-  PAID: { label: 'Pago', variant: 'success' },
-  PENDING: { label: 'Pendente', variant: 'warning' },
-  FAILED: { label: 'Falhou', variant: 'danger' },
-  REFUNDED: { label: 'Estornado', variant: 'neutral' },
-  CHARGEBACK: { label: 'Chargeback', variant: 'danger' },
-};
 
 export default function FinanceiroPage() {
   const [data, setData] = useState<Finance | null>(null);
@@ -128,46 +120,166 @@ export default function FinanceiroPage() {
   );
 }
 
+interface SubArea {
+  id: string;
+  name: string;
+  monthlyPriceBRL: number | null;
+  billable: boolean;
+}
 interface Area {
   id: string;
   name: string;
   monthlyPriceBRL: number | null;
   billable: boolean;
+  subcategories: SubArea[];
+}
+
+/** Resolve a seleção (áreas inteiras + sub-temas) em ids e soma de referência. */
+function scopeSummary(areas: Area[], selectedAreas: Set<string>, selectedSubs: Set<string>) {
+  let sum = 0;
+  const areaIds: string[] = [];
+  const subcategoryIds: string[] = [];
+  for (const a of areas) {
+    if (selectedAreas.has(a.id)) {
+      areaIds.push(a.id);
+      sum += a.subcategories.length
+        ? a.subcategories.reduce((t, s) => t + (s.monthlyPriceBRL ?? 0), 0)
+        : a.monthlyPriceBRL ?? 0;
+    } else {
+      for (const s of a.subcategories) {
+        if (selectedSubs.has(s.id)) {
+          subcategoryIds.push(s.id);
+          sum += s.monthlyPriceBRL ?? 0;
+        }
+      }
+    }
+  }
+  return { areaIds, subcategoryIds, sum };
+}
+
+/** Seletor hierárquico: marca a área inteira ou sub-temas específicos. */
+function ScopeSelector({
+  areas,
+  selectedAreas,
+  selectedSubs,
+  onToggleArea,
+  onToggleSub,
+}: {
+  areas: Area[];
+  selectedAreas: Set<string>;
+  selectedSubs: Set<string>;
+  onToggleArea: (id: string) => void;
+  onToggleSub: (id: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      {areas.map((a) => {
+        const hasSub = a.subcategories.length > 0;
+        const areaOn = selectedAreas.has(a.id);
+        return (
+          <div key={a.id} className="rounded-md border border-border p-3">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" checked={areaOn} onChange={() => onToggleArea(a.id)} />
+              {a.name}{' '}
+              {hasSub ? (
+                <span className="text-xs font-normal text-muted-foreground">(área inteira — todos os sub-temas)</span>
+              ) : (
+                a.monthlyPriceBRL != null && (
+                  <span className="text-xs font-normal text-muted-foreground">{brl(a.monthlyPriceBRL)}</span>
+                )
+              )}
+            </label>
+            {hasSub && (
+              <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 border-l border-border pl-4">
+                {a.subcategories.map((s) => (
+                  <label
+                    key={s.id}
+                    className={cn('flex items-center gap-2 text-sm', areaOn && 'text-muted-foreground')}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={areaOn || selectedSubs.has(s.id)}
+                      disabled={areaOn}
+                      onChange={() => onToggleSub(s.id)}
+                    />
+                    {s.name}
+                    {s.monthlyPriceBRL != null && <span className="text-xs opacity-70">{brl(s.monthlyPriceBRL)}</span>}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function AreaPricing() {
   const [areas, setAreas] = useState<Area[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState<Record<string, string>>({});
-  const [savedId, setSavedId] = useState<string | null>(null);
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const [newSub, setNewSub] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
 
   function load() {
     apiFetch<Area[]>('/admin/areas')
       .then((a) => {
         setAreas(a);
-        setDraft(Object.fromEntries(a.map((x) => [x.id, x.monthlyPriceBRL?.toString() ?? ''])));
+        const d: Record<string, string> = {};
+        for (const x of a) {
+          d[x.id] = x.monthlyPriceBRL?.toString() ?? '';
+          for (const s of x.subcategories) d[s.id] = s.monthlyPriceBRL?.toString() ?? '';
+        }
+        setDraft(d);
       })
       .finally(() => setLoading(false));
   }
   useEffect(load, []);
 
-  async function save(id: string) {
+  async function saveArea(id: string) {
     const priceBRL = Number(draft[id] || 0);
-    await apiFetch(`/admin/areas/${id}/price`, {
-      method: 'POST',
-      body: JSON.stringify({ priceBRL, billable: priceBRL > 0 }),
-    });
-    setSavedId(id);
-    setTimeout(() => setSavedId(null), 1500);
+    await apiFetch(`/admin/areas/${id}/price`, { method: 'POST', body: JSON.stringify({ priceBRL, billable: priceBRL > 0 }) });
     load();
+  }
+  async function saveSub(id: string) {
+    const priceBRL = Number(draft[id] || 0);
+    await apiFetch(`/admin/subareas/${id}/price`, { method: 'POST', body: JSON.stringify({ priceBRL, billable: priceBRL > 0 }) });
+    load();
+  }
+  async function addSub(areaId: string) {
+    const name = (newSub[areaId] ?? '').trim();
+    if (!name) return;
+    setBusy(true);
+    try {
+      await apiFetch('/admin/subareas', { method: 'POST', body: JSON.stringify({ categoryId: areaId, name }) });
+      setNewSub((n) => ({ ...n, [areaId]: '' }));
+      load();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function delSub(id: string) {
+    if (!confirm('Remover este sub-tema?')) return;
+    await apiFetch(`/admin/subareas/${id}`, { method: 'DELETE' });
+    load();
+  }
+  function toggle(id: string) {
+    setOpen((o) => {
+      const n = new Set(o);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Áreas do Direito — preço mensal</CardTitle>
+        <CardTitle className="text-base">Áreas e sub-temas — preço mensal</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Defina o valor de cada área. O advogado monta o combo dele somando as áreas.
+          Áreas com sub-temas (ex.: Direito Cível → Família, Sucessões…) são precificadas por sub-tema.
+          Expanda para gerenciar.
         </p>
       </CardHeader>
       <CardContent>
@@ -175,25 +287,79 @@ function AreaPricing() {
           <Spinner className="text-muted-foreground" />
         ) : (
           <div className="flex flex-col divide-y divide-border">
-            {areas.map((a) => (
-              <div key={a.id} className="flex items-center justify-between gap-4 py-3">
-                <span className="text-sm">{a.name}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">R$</span>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    className="h-9 w-28"
-                    placeholder="0,00"
-                    value={draft[a.id] ?? ''}
-                    onChange={(e) => setDraft((d) => ({ ...d, [a.id]: e.target.value }))}
-                  />
-                  <Button size="sm" variant="outline" onClick={() => save(a.id)}>
-                    {savedId === a.id ? '✓' : 'Salvar'}
-                  </Button>
+            {areas.map((a) => {
+              const hasSub = a.subcategories.length > 0;
+              const subSum = a.subcategories.reduce((t, s) => t + (s.monthlyPriceBRL ?? 0), 0);
+              return (
+                <div key={a.id} className="py-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <button type="button" onClick={() => toggle(a.id)} className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">{open.has(a.id) ? '▾' : '▸'}</span>
+                      {a.name}
+                      {hasSub && (
+                        <span className="text-xs text-muted-foreground">
+                          ({a.subcategories.length} sub-temas · {brl(subSum)})
+                        </span>
+                      )}
+                    </button>
+                    {!hasSub && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">R$</span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          className="h-9 w-28"
+                          placeholder="0,00"
+                          value={draft[a.id] ?? ''}
+                          onChange={(e) => setDraft((d) => ({ ...d, [a.id]: e.target.value }))}
+                        />
+                        <Button size="sm" variant="outline" onClick={() => saveArea(a.id)}>
+                          Salvar
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  {open.has(a.id) && (
+                    <div className="mt-3 flex flex-col gap-2 border-l border-border pl-4">
+                      {a.subcategories.map((s) => (
+                        <div key={s.id} className="flex items-center justify-between gap-3">
+                          <span className="text-sm text-muted-foreground">{s.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">R$</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              className="h-8 w-24"
+                              placeholder="0,00"
+                              value={draft[s.id] ?? ''}
+                              onChange={(e) => setDraft((d) => ({ ...d, [s.id]: e.target.value }))}
+                            />
+                            <Button size="sm" variant="outline" onClick={() => saveSub(s.id)}>
+                              Salvar
+                            </Button>
+                            <button onClick={() => delSub(s.id)} className="text-xs text-muted-foreground hover:text-accent" title="Remover">
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2 pt-1">
+                        <Input
+                          className="h-8"
+                          placeholder="Novo sub-tema (ex.: Família)"
+                          value={newSub[a.id] ?? ''}
+                          onChange={(e) => setNewSub((n) => ({ ...n, [a.id]: e.target.value }))}
+                          onKeyDown={(e) => e.key === 'Enter' && addSub(a.id)}
+                        />
+                        <Button size="sm" disabled={busy} onClick={() => addSub(a.id)}>
+                          + Sub-tema
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>
@@ -210,6 +376,7 @@ interface PlanItem {
   active: boolean;
   highlights: string[];
   areas: Array<{ id: string; name: string }>;
+  subcategories: Array<{ id: string; name: string }>;
 }
 
 function PlansList({
@@ -273,7 +440,8 @@ function PlansList({
                 {p.name} {!p.active && <span className="text-xs text-muted-foreground">(inativo)</span>}
               </p>
               <p className="text-xs text-muted-foreground">
-                {brl(p.priceBRL)}/mês · {p.areas.map((a) => a.name).join(', ') || 'sem áreas'}
+                {brl(p.priceBRL)}/mês ·{' '}
+                {[...p.areas.map((a) => a.name), ...p.subcategories.map((s) => s.name)].join(', ') || 'sem áreas'}
                 {subscribersByName[p.name] != null ? ` · ${subscribersByName[p.name]} assinante(s)` : ''}
               </p>
             </div>
@@ -305,16 +473,24 @@ function PlanEditor({
   const [price, setPrice] = useState(String(plan.priceBRL));
   const [cases, setCases] = useState(String(plan.casesPerMonth));
   const [active, setActive] = useState(plan.active);
-  const [selected, setSelected] = useState<Set<string>>(new Set(plan.areas.map((a) => a.id)));
+  const [selAreas, setSelAreas] = useState<Set<string>>(new Set(plan.areas.map((a) => a.id)));
+  const [selSubs, setSelSubs] = useState<Set<string>>(new Set(plan.subcategories.map((s) => s.id)));
   const [busy, setBusy] = useState(false);
 
-  function toggle(id: string) {
-    setSelected((s) => {
+  const toggleArea = (id: string) =>
+    setSelAreas((s) => {
       const n = new Set(s);
       n.has(id) ? n.delete(id) : n.add(id);
       return n;
     });
-  }
+  const toggleSub = (id: string) =>
+    setSelSubs((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+
+  const { areaIds, subcategoryIds, sum } = scopeSummary(areas, selAreas, selSubs);
 
   async function save() {
     setBusy(true);
@@ -325,7 +501,8 @@ function PlanEditor({
           name,
           priceBRL: Number(price),
           casesPerMonth: Number(cases || 0),
-          areaIds: [...selected],
+          areaIds,
+          subcategoryIds,
           active,
         }),
       });
@@ -345,21 +522,10 @@ function PlanEditor({
           <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Plano ativo
         </label>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {areas.map((a) => (
-          <button
-            type="button"
-            key={a.id}
-            onClick={() => toggle(a.id)}
-            className={cn(
-              'rounded-full border px-3 py-1 text-sm transition-colors',
-              selected.has(a.id) ? 'border-accent bg-accent/15 text-foreground' : 'border-border text-muted-foreground hover:bg-muted',
-            )}
-          >
-            {a.name}
-          </button>
-        ))}
-      </div>
+      <ScopeSelector areas={areas} selectedAreas={selAreas} selectedSubs={selSubs} onToggleArea={toggleArea} onToggleSub={toggleSub} />
+      <p className="text-xs text-muted-foreground">
+        Soma avulsa: <span className="tabular-nums">{brl(sum)}</span>
+      </p>
       <div className="flex gap-2">
         <Button size="sm" disabled={busy} onClick={save}>
           {busy ? <Spinner /> : 'Salvar'}
@@ -456,7 +622,8 @@ function NewPlanForm({ onCreated }: { onCreated: () => void }) {
   const [cases, setCases] = useState('');
   const [highlights, setHighlights] = useState('');
   const [areas, setAreas] = useState<Area[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selAreas, setSelAreas] = useState<Set<string>>(new Set());
+  const [selSubs, setSelSubs] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -464,16 +631,21 @@ function NewPlanForm({ onCreated }: { onCreated: () => void }) {
     apiFetch<Area[]>('/admin/areas').then(setAreas).catch(() => {});
   }, []);
 
-  function toggle(id: string) {
-    setSelected((s) => {
-      const next = new Set(s);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
+  const toggleArea = (id: string) =>
+    setSelAreas((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
     });
-  }
+  const toggleSub = (id: string) =>
+    setSelSubs((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
 
-  // Soma das áreas escolhidas (referência para o admin definir o preço do combo).
-  const sum = areas.filter((a) => selected.has(a.id)).reduce((t, a) => t + (a.monthlyPriceBRL ?? 0), 0);
+  const { areaIds, subcategoryIds, sum } = scopeSummary(areas, selAreas, selSubs);
+  const hasScope = areaIds.length + subcategoryIds.length > 0;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -487,7 +659,8 @@ function NewPlanForm({ onCreated }: { onCreated: () => void }) {
           name,
           priceBRL: Number(price),
           casesPerMonth: Number(cases || 0),
-          areaIds: [...selected],
+          areaIds,
+          subcategoryIds,
           highlights: highlights.split(',').map((h) => h.trim()).filter(Boolean),
         }),
       });
@@ -508,25 +681,11 @@ function NewPlanForm({ onCreated }: { onCreated: () => void }) {
         <Input type="number" placeholder="Casos/mês (opcional)" value={cases} onChange={(e) => setCases(e.target.value)} />
       </div>
       <div>
-        <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Áreas incluídas</p>
-        <div className="flex flex-wrap gap-2">
-          {areas.map((a) => (
-            <button
-              type="button"
-              key={a.id}
-              onClick={() => toggle(a.id)}
-              className={`rounded-full border px-3 py-1 text-sm transition-colors ${
-                selected.has(a.id) ? 'border-accent bg-accent/15 text-foreground' : 'border-border text-muted-foreground hover:bg-muted'
-              }`}
-            >
-              {a.name}
-              {a.monthlyPriceBRL != null && <span className="ml-1 text-xs opacity-70">{brl(a.monthlyPriceBRL)}</span>}
-            </button>
-          ))}
-        </div>
-        {selected.size > 0 && (
+        <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Áreas e sub-temas incluídos</p>
+        <ScopeSelector areas={areas} selectedAreas={selAreas} selectedSubs={selSubs} onToggleArea={toggleArea} onToggleSub={toggleSub} />
+        {hasScope && (
           <p className="mt-2 text-xs text-muted-foreground">
-            Soma avulsa das áreas: <span className="tabular-nums">{brl(sum)}</span> — defina o preço do combo (pode dar desconto).
+            Soma avulsa: <span className="tabular-nums">{brl(sum)}</span> — defina o preço do combo (pode dar desconto).
           </p>
         )}
       </div>

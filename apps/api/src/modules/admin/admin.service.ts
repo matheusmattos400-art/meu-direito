@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { User } from '@app/db';
+import { randomUUID } from 'node:crypto';
 import type {
   AdminCreateLawyerInput,
   CreateAdminInput,
@@ -232,11 +233,12 @@ export class AdminService {
   }
 
   // ---------------- Financeiro ----------------
-  /** Lista as áreas do Direito com o preço mensal (definido pelo admin). */
+  /** Lista as áreas do Direito com preço e sub-temas (cada um com preço próprio). */
   async listAreas() {
     const cats = await this.prisma.category.findMany({
       where: { active: true },
       orderBy: { name: 'asc' },
+      include: { subcategories: { where: { active: true }, orderBy: { name: 'asc' } } },
     });
     return cats.map((c) => ({
       id: c.id,
@@ -244,7 +246,70 @@ export class AdminService {
       name: c.name,
       monthlyPriceBRL: c.monthlyPriceBRL != null ? Number(c.monthlyPriceBRL) : null,
       billable: c.billable,
+      subcategories: c.subcategories.map((s) => ({
+        id: s.id,
+        name: s.name,
+        monthlyPriceBRL: s.monthlyPriceBRL != null ? Number(s.monthlyPriceBRL) : null,
+        billable: s.billable,
+      })),
     }));
+  }
+
+  /** Cria um sub-tema dentro de uma área (ex.: Família em Direito Civil). */
+  async createSubarea(admin: User, categoryId: string, name: string) {
+    const cat = await this.prisma.category.findUnique({ where: { id: categoryId } });
+    if (!cat) throw new NotFoundException('Área não encontrada.');
+    const base = name
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    const sub = await this.prisma.subcategory.create({
+      data: { categoryId, name, slug: `${base || 'tema'}-${randomUUID().slice(0, 4)}` },
+    });
+    await this.audit.log({
+      actorId: admin.id,
+      actorRole: 'ADMIN',
+      action: 'SUBAREA_CREATE',
+      entityType: 'Subcategory',
+      entityId: sub.id,
+      metadata: { categoryId, name },
+    });
+    return { id: sub.id };
+  }
+
+  async setSubareaPrice(admin: User, id: string, priceBRL: number, billable: boolean) {
+    const sub = await this.prisma.subcategory.findUnique({ where: { id } });
+    if (!sub) throw new NotFoundException('Sub-tema não encontrado.');
+    await this.prisma.subcategory.update({
+      where: { id },
+      data: { monthlyPriceBRL: priceBRL, billable },
+    });
+    await this.audit.log({
+      actorId: admin.id,
+      actorRole: 'ADMIN',
+      action: 'SUBAREA_SET_PRICE',
+      entityType: 'Subcategory',
+      entityId: id,
+      metadata: { priceBRL, billable },
+    });
+    return { id, monthlyPriceBRL: priceBRL, billable };
+  }
+
+  async deleteSubarea(admin: User, id: string) {
+    const sub = await this.prisma.subcategory.findUnique({ where: { id } });
+    if (!sub) throw new NotFoundException('Sub-tema não encontrado.');
+    await this.prisma.planSubcategory.deleteMany({ where: { subcategoryId: id } });
+    await this.prisma.subcategory.update({ where: { id }, data: { active: false } });
+    await this.audit.log({
+      actorId: admin.id,
+      actorRole: 'ADMIN',
+      action: 'SUBAREA_DELETE',
+      entityType: 'Subcategory',
+      entityId: id,
+    });
+    return { id };
   }
 
   /** Define o preço mensal de uma área e se ela é ofertada como assinatura. */
@@ -270,7 +335,10 @@ export class AdminService {
   async listPlans() {
     const plans = await this.prisma.plan.findMany({
       orderBy: { priceBRL: 'asc' },
-      include: { planAreas: { include: { category: true } } },
+      include: {
+        planAreas: { include: { category: true } },
+        planSubcategories: { include: { subcategory: true } },
+      },
     });
     return plans.map((p) => ({
       id: p.id,
@@ -281,6 +349,7 @@ export class AdminService {
       active: p.active,
       highlights: p.highlights,
       areas: p.planAreas.map((pa) => ({ id: pa.categoryId, name: pa.category.name })),
+      subcategories: p.planSubcategories.map((ps) => ({ id: ps.subcategoryId, name: ps.subcategory.name })),
     }));
   }
 
@@ -297,6 +366,7 @@ export class AdminService {
         areas: dto.areaIds.length || 1,
         highlights: dto.highlights,
         planAreas: { create: dto.areaIds.map((categoryId) => ({ categoryId })) },
+        planSubcategories: { create: dto.subcategoryIds.map((subcategoryId) => ({ subcategoryId })) },
       },
     });
     await this.audit.log({
@@ -331,6 +401,15 @@ export class AdminService {
       if (dto.areaIds.length > 0) {
         await this.prisma.planArea.createMany({
           data: dto.areaIds.map((categoryId) => ({ planId: id, categoryId })),
+        });
+      }
+    }
+
+    if (dto.subcategoryIds !== undefined) {
+      await this.prisma.planSubcategory.deleteMany({ where: { planId: id } });
+      if (dto.subcategoryIds.length > 0) {
+        await this.prisma.planSubcategory.createMany({
+          data: dto.subcategoryIds.map((subcategoryId) => ({ planId: id, subcategoryId })),
         });
       }
     }
