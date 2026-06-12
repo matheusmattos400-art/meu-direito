@@ -50,18 +50,22 @@ export default function SuportePage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsLogin, setNeedsLogin] = useState(false);
+  const [role, setRole] = useState<'LAWYER' | 'CITIZEN' | 'ADMIN' | null>(null);
 
   const loadList = useCallback(() => {
     return apiFetch<TicketSummary[]>('/support/tickets').then(setTickets);
   }, []);
 
   useEffect(() => {
+    apiFetch<{ role: 'LAWYER' | 'CITIZEN' | 'ADMIN' }>('/me').then((m) => setRole(m.role)).catch(() => {});
     loadList()
       .catch((err) => {
         if (err instanceof ApiError && err.status === 401) setNeedsLogin(true);
       })
       .finally(() => setLoading(false));
   }, [loadList]);
+
+  const backHref = role === 'LAWYER' ? '/advogado' : role === 'ADMIN' ? '/admin' : '/meus-casos';
 
   if (loading) {
     return (
@@ -91,6 +95,9 @@ export default function SuportePage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-6 py-16">
+      <Link href={backHref} className="mb-4 inline-block text-sm text-muted-foreground hover:text-foreground">
+        ← Voltar ao painel
+      </Link>
       <h1 className="mb-2 font-serif text-3xl tracking-tightish">Suporte da plataforma</h1>
       <p className="mb-8 text-sm text-muted-foreground">
         Problemas, dúvidas ou reclamações sobre o uso do aplicativo? Fale com a nossa equipe.

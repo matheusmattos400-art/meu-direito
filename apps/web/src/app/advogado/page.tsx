@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Badge, Button, Card, CardContent, Input, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
 import { useMe } from '@/lib/use-me';
+
+const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 interface Movement {
   rawText: string;
@@ -145,6 +147,9 @@ export default function AdvogadoDashboard() {
         ))}
       </div>
 
+      {/* Meu plano */}
+      <MyPlanCard />
+
       {/* Pesquisa jurídica (abas) */}
       <ResearchPanel onSaved={() => setSavedTick((t) => t + 1)} />
 
@@ -164,6 +169,91 @@ interface Followed {
   subject: string | null;
   lastSyncedAt: string | null;
   lastMovement: { text: string; rawText: string; occurredAt: string | null } | null;
+}
+
+interface Subscription {
+  id: string;
+  status: string;
+  planCode: string | null;
+  currentPeriodEnd: string | null;
+  monthlyTotalBRL: number | null;
+  areas: Array<{ id: string; name: string }>;
+  plan: { code: string; name: string } | null;
+}
+
+function MyPlanCard() {
+  const [sub, setSub] = useState<Subscription | null | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    apiFetch<Subscription | null>('/billing/subscription')
+      .then(setSub)
+      .catch(() => setSub(null));
+  }, []);
+  useEffect(load, [load]);
+
+  async function cancel() {
+    if (!confirm('Cancelar seu plano? Você perde o acesso às áreas que assina.')) return;
+    setBusy(true);
+    try {
+      await apiFetch('/billing/cancel', { method: 'POST' });
+      load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (sub === undefined) return null;
+  const active = sub !== null && sub.status === 'ACTIVE';
+
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="font-serif text-xl tracking-tightish">Meu plano</h2>
+      <Card className="border-border/60 bg-card/70">
+        <CardContent className="flex flex-col gap-4 pt-6">
+          {active && sub ? (
+            <>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">{sub.plan ? sub.plan.name : 'Combo personalizado'}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {sub.areas.map((a) => a.name).join(', ') || 'Sem áreas'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-serif text-2xl tracking-tightish text-accent">
+                    {sub.monthlyTotalBRL != null ? `${brl(sub.monthlyTotalBRL)}` : '—'}
+                    <span className="text-sm text-muted-foreground">/mês</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Vence em{' '}
+                    {sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString('pt-BR') : '—'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+                <Link href="/advogado/planos">
+                  <Button size="sm">Modificar plano</Button>
+                </Link>
+                <Button size="sm" variant="outline" disabled={busy} onClick={cancel} className="text-accent">
+                  {busy ? <Spinner /> : 'Cancelar plano'}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                Você ainda não tem um plano ativo — sem plano você não recebe chamadas.
+              </p>
+              <Link href="/advogado/planos">
+                <Button size="sm">Escolher plano</Button>
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </section>
+  );
 }
 
 function FollowedProcesses({ reloadKey }: { reloadKey: number }) {
