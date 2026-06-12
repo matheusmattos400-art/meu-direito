@@ -23,10 +23,13 @@ const FILTERS: Array<{ key: 'ALL' | Ticket['status']; label: string }> = [
   { key: 'RESOLVED', label: 'Resolvidos' },
 ];
 
+const STATUS_ORDER: Record<Ticket['status'], number> = { OPEN: 0, IN_PROGRESS: 1, RESOLVED: 2 };
+
 export default function SuporteAdminPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<'LAWYER' | 'PUBLIC'>('LAWYER');
   const [filter, setFilter] = useState<'ALL' | Ticket['status']>('ALL');
 
   useEffect(() => {
@@ -36,9 +39,30 @@ export default function SuporteAdminPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = filter === 'ALL' ? tickets : tickets.filter((t) => t.status === filter);
-  const advogados = useMemo(() => filtered.filter((t) => t.requesterRole === 'LAWYER'), [filtered]);
-  const publico = useMemo(() => filtered.filter((t) => t.requesterRole !== 'LAWYER'), [filtered]);
+  const stats = useMemo(() => {
+    const resolved = tickets.filter((t) => t.status === 'RESOLVED').length;
+    const lawyers = tickets.filter((t) => t.requesterRole === 'LAWYER').length;
+    return {
+      total: tickets.length,
+      resolved,
+      notResolved: tickets.length - resolved,
+      lawyers,
+      publico: tickets.length - lawyers,
+    };
+  }, [tickets]);
+
+  const list = useMemo(() => {
+    const byTab = tickets.filter((t) =>
+      tab === 'LAWYER' ? t.requesterRole === 'LAWYER' : t.requesterRole !== 'LAWYER',
+    );
+    const byFilter = filter === 'ALL' ? byTab : byTab.filter((t) => t.status === filter);
+    // não resolvidos no topo
+    return [...byFilter].sort(
+      (a, b) =>
+        STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
+        new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime(),
+    );
+  }, [tickets, tab, filter]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -46,11 +70,41 @@ export default function SuporteAdminPage() {
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Atendimento</p>
         <h1 className="mt-1 font-serif text-4xl tracking-tightish">Suporte</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Reclamações e dúvidas dos usuários sobre a plataforma (advogados e público).
+          Reclamações e dúvidas sobre a plataforma — advogados e público em geral.
         </p>
       </header>
 
-      <div className="flex flex-wrap gap-2 border-b border-border pb-3">
+      {/* Números do suporte */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <Stat label="Chamados" value={stats.total} />
+        <Stat label="Não resolvidos" value={stats.notResolved} accent={stats.notResolved > 0} />
+        <Stat label="Resolvidos" value={stats.resolved} />
+        <Stat label="De advogados" value={stats.lawyers} />
+        <Stat label="Do público" value={stats.publico} />
+      </div>
+
+      {/* Abas: Advogados × Público em geral */}
+      <div className="flex gap-6 border-b border-border">
+        <button
+          onClick={() => setTab('LAWYER')}
+          className={`-mb-px border-b-2 pb-3 text-sm transition-colors ${
+            tab === 'LAWYER' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Advogados <span className="ml-1 tabular-nums opacity-70">{stats.lawyers}</span>
+        </button>
+        <button
+          onClick={() => setTab('PUBLIC')}
+          className={`-mb-px border-b-2 pb-3 text-sm transition-colors ${
+            tab === 'PUBLIC' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Público em geral <span className="ml-1 tabular-nums opacity-70">{stats.publico}</span>
+        </button>
+      </div>
+
+      {/* Filtro por status */}
+      <div className="-mt-3 flex flex-wrap gap-2">
         {FILTERS.map((f) => (
           <button
             key={f.key}
@@ -68,29 +122,11 @@ export default function SuporteAdminPage() {
         <Spinner className="text-muted-foreground" />
       ) : error ? (
         <p className="text-sm text-accent">{error}</p>
-      ) : (
-        <div className="flex flex-col gap-8">
-          <Group title="Advogados" tickets={advogados} />
-          <Group title="Público em geral" tickets={publico} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Group({ title, tickets }: { title: string; tickets: Ticket[] }) {
-  return (
-    <section>
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-        {title}
-        <span className="h-px flex-1 bg-border" />
-        <span className="text-xs">{tickets.length}</span>
-      </h2>
-      {tickets.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nenhum chamado.</p>
+      ) : list.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nenhum chamado nesta categoria.</p>
       ) : (
         <div className="flex flex-col gap-2">
-          {tickets.map((t) => {
+          {list.map((t) => {
             const st = STATUS_META[t.status];
             return (
               <Link key={t.id} href={`/admin/suporte/${t.id}`}>
@@ -113,6 +149,18 @@ function Group({ title, tickets }: { title: string; tickets: Ticket[] }) {
           })}
         </div>
       )}
-    </section>
+    </div>
+  );
+}
+
+function Stat({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="relative pt-5">
+        <div className={`absolute inset-x-0 top-0 h-1 ${accent ? 'bg-accent' : 'bg-border'}`} aria-hidden />
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="mt-1 font-serif text-3xl tracking-tightish tabular-nums">{value}</p>
+      </CardContent>
+    </Card>
   );
 }
