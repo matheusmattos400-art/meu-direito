@@ -293,15 +293,17 @@ function AreaPricing() {
               return (
                 <div key={a.id} className="py-3">
                   <div className="flex items-center justify-between gap-4">
-                    <button type="button" onClick={() => toggle(a.id)} className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground">{open.has(a.id) ? '▾' : '▸'}</span>
-                      {a.name}
-                      {hasSub && (
+                    {hasSub ? (
+                      <button type="button" onClick={() => toggle(a.id)} className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">{open.has(a.id) ? '▾' : '▸'}</span>
+                        {a.name}
                         <span className="text-xs text-muted-foreground">
                           ({a.subcategories.length} sub-temas · {brl(subSum)})
                         </span>
-                      )}
-                    </button>
+                      </button>
+                    ) : (
+                      <span className="text-sm">{a.name}</span>
+                    )}
                     {!hasSub && (
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">R$</span>
@@ -319,7 +321,7 @@ function AreaPricing() {
                       </div>
                     )}
                   </div>
-                  {open.has(a.id) && (
+                  {hasSub && open.has(a.id) && (
                     <div className="mt-3 flex flex-col gap-2 border-l border-border pl-4">
                       {a.subcategories.map((s) => (
                         <div key={s.id} className="flex items-center justify-between gap-3">
