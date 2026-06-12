@@ -5,6 +5,7 @@ import type {
   CreateAdminInput,
   CreatePlanInput,
   RejectLawyerInput,
+  UpdatePlanInput,
 } from '@app/validation';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
@@ -269,6 +270,86 @@ export class AdminService {
       metadata: { code: plan.code, areas: dto.areaIds.length },
     });
     return { id: plan.id, code: plan.code };
+  }
+
+  async updatePlan(admin: User, id: string, dto: UpdatePlanInput) {
+    const plan = await this.prisma.plan.findUnique({ where: { id } });
+    if (!plan) throw new NotFoundException('Plano não encontrado.');
+
+    await this.prisma.plan.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.priceBRL !== undefined ? { priceBRL: dto.priceBRL } : {}),
+        ...(dto.casesPerMonth !== undefined ? { casesPerMonth: dto.casesPerMonth } : {}),
+        ...(dto.highlights !== undefined ? { highlights: dto.highlights } : {}),
+        ...(dto.active !== undefined ? { active: dto.active } : {}),
+        ...(dto.areaIds !== undefined ? { areas: dto.areaIds.length || 1 } : {}),
+      },
+    });
+
+    if (dto.areaIds !== undefined) {
+      await this.prisma.planArea.deleteMany({ where: { planId: id } });
+      if (dto.areaIds.length > 0) {
+        await this.prisma.planArea.createMany({
+          data: dto.areaIds.map((categoryId) => ({ planId: id, categoryId })),
+        });
+      }
+    }
+
+    await this.audit.log({
+      actorId: admin.id,
+      actorRole: 'ADMIN',
+      action: 'PLAN_UPDATE',
+      entityType: 'Plan',
+      entityId: id,
+    });
+    return { id };
+  }
+
+  async deletePlan(admin: User, id: string) {
+    const plan = await this.prisma.plan.findUnique({ where: { id } });
+    if (!plan) throw new NotFoundException('Plano não encontrado.');
+    await this.prisma.plan.delete({ where: { id } }); // PlanArea em cascata
+    await this.audit.log({
+      actorId: admin.id,
+      actorRole: 'ADMIN',
+      action: 'PLAN_DELETE',
+      entityType: 'Plan',
+      entityId: id,
+      metadata: { code: plan.code },
+    });
+    return { id };
+  }
+
+  /** Histórico de receita (pagamentos PAGOS) de um dia específico. */
+  async paymentsByDate(dateStr?: string) {
+    const now = new Date();
+    let day: Date;
+    const m = (dateStr ?? '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    day = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const start = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+
+    const payments = await this.prisma.payment.findMany({
+      where: { status: 'PAID', paidAt: { gte: start, lt: end } },
+      orderBy: { paidAt: 'desc' },
+      include: { payerUser: { select: { email: true, fullName: true } } },
+    });
+
+    const iso = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+    return {
+      date: iso,
+      total: payments.reduce((s, p) => s + Number(p.amount), 0),
+      count: payments.length,
+      payments: payments.map((p) => ({
+        id: p.id,
+        payer: p.payerUser.fullName ?? p.payerUser.email,
+        amount: Number(p.amount),
+        method: p.method,
+        paidAt: p.paidAt,
+      })),
+    };
   }
 
   async finance() {

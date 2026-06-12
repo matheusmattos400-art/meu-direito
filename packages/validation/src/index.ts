@@ -168,6 +168,17 @@ export const createPlanSchema = z.object({
 });
 export type CreatePlanInput = z.infer<typeof createPlanSchema>;
 
+/** Edição de um plano combo existente (campos opcionais). */
+export const updatePlanSchema = z.object({
+  name: z.string().min(2).max(60).optional(),
+  priceBRL: z.coerce.number().nonnegative('Preço inválido.').optional(),
+  casesPerMonth: z.coerce.number().int().nonnegative().optional(),
+  areaIds: z.array(z.string().uuid()).optional(),
+  highlights: z.array(z.string().max(80)).max(8).optional(),
+  active: z.boolean().optional(),
+});
+export type UpdatePlanInput = z.infer<typeof updatePlanSchema>;
+
 /** Preço mensal de uma área do Direito (definido pelo admin). */
 export const areaPriceSchema = z.object({
   priceBRL: z.coerce.number().nonnegative('Preço inválido.'),

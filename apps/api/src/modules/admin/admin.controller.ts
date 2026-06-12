@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { User } from '@app/db';
 import {
@@ -8,12 +8,14 @@ import {
   createPlanSchema,
   rejectLawyerSchema,
   setAdminScopesSchema,
+  updatePlanSchema,
   type AdminCreateLawyerInput,
   type AreaPriceInput,
   type CreateAdminInput,
   type CreatePlanInput,
   type RejectLawyerInput,
   type SetAdminScopesInput,
+  type UpdatePlanInput,
 } from '@app/validation';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { Roles } from '../../common/auth/roles.decorator';
@@ -66,6 +68,13 @@ export class AdminController {
     return this.admin.evolution(from, to).then((data) => ({ data }));
   }
 
+  @Get('finance/payments')
+  @RequireScope('FINANCEIRO')
+  @ApiOperation({ summary: 'Histórico de receita (pagamentos pagos) de um dia (filtro por data).' })
+  financePayments(@Query('date') date?: string) {
+    return this.admin.paymentsByDate(date).then((data) => ({ data }));
+  }
+
   @Get('plans')
   @RequireScope('FINANCEIRO')
   @ApiOperation({ summary: 'Lista os planos combo com as áreas incluídas.' })
@@ -81,6 +90,24 @@ export class AdminController {
     @Body(new ZodValidationPipe(createPlanSchema)) dto: CreatePlanInput,
   ) {
     return this.admin.createPlan(user, dto).then((data) => ({ data }));
+  }
+
+  @Patch('plans/:id')
+  @RequireScope('FINANCEIRO')
+  @ApiOperation({ summary: 'Edita um plano combo (nome, valor, áreas, ativo).' })
+  updatePlan(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(updatePlanSchema)) dto: UpdatePlanInput,
+  ) {
+    return this.admin.updatePlan(user, id, dto).then((data) => ({ data }));
+  }
+
+  @Delete('plans/:id')
+  @RequireScope('FINANCEIRO')
+  @ApiOperation({ summary: 'Exclui um plano combo.' })
+  deletePlan(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.admin.deletePlan(user, id).then((data) => ({ data }));
   }
 
   @Get('areas')

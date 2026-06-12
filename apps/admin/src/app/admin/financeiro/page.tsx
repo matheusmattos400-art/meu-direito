@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Spinner } from '@app/ui';
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Spinner, cn } from '@app/ui';
 import { apiFetch } from '@/lib/api';
 
 interface Finance {
@@ -38,6 +38,7 @@ export default function FinanceiroPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showPlanForm, setShowPlanForm] = useState(false);
+  const [planTick, setPlanTick] = useState(0);
 
   function load() {
     apiFetch<Finance>('/admin/finance')
@@ -109,50 +110,20 @@ export default function FinanceiroPage() {
           </Button>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          {showPlanForm && <NewPlanForm onCreated={() => { setShowPlanForm(false); load(); }} />}
-          <div className="flex flex-col gap-3">
-            {data.byPlan.map((p) => (
-              <div key={p.plan} className="flex items-center justify-between text-sm">
-                <span>{p.plan}</span>
-                <span className="text-muted-foreground">
-                  {p.subscribers} assinante(s) · {brl(p.price)}/mês
-                </span>
-              </div>
-            ))}
-          </div>
+          {showPlanForm && (
+            <NewPlanForm
+              onCreated={() => {
+                setShowPlanForm(false);
+                setPlanTick((t) => t + 1);
+                load();
+              }}
+            />
+          )}
+          <PlansList reloadKey={planTick} onChanged={load} subscribersByName={Object.fromEntries(data.byPlan.map((p) => [p.plan, p.subscribers]))} />
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Pagamentos recentes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {data.payments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum pagamento registrado.</p>
-          ) : (
-            <div className="flex flex-col divide-y divide-border">
-              {data.payments.map((p) => {
-                const st = PAYMENT_STATUS[p.status] ?? { label: p.status, variant: 'neutral' as const };
-                return (
-                  <div key={p.id} className="flex items-center justify-between gap-4 py-3 text-sm">
-                    <div className="min-w-0">
-                      <p className="truncate">{p.payer ?? '—'}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {p.method} · {new Date(p.createdAt).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="tabular-nums">{brl(p.amount)}</span>
-                      <Badge variant={st.variant}>{st.label}</Badge>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <RevenueHistory />
     </div>
   );
 }
@@ -223,6 +194,254 @@ function AreaPricing() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface PlanItem {
+  id: string;
+  code: string;
+  name: string;
+  priceBRL: number;
+  casesPerMonth: number;
+  active: boolean;
+  highlights: string[];
+  areas: Array<{ id: string; name: string }>;
+}
+
+function PlansList({
+  reloadKey,
+  onChanged,
+  subscribersByName,
+}: {
+  reloadKey: number;
+  onChanged: () => void;
+  subscribersByName: Record<string, number>;
+}) {
+  const [plans, setPlans] = useState<PlanItem[]>([]);
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  function load() {
+    apiFetch<PlanItem[]>('/admin/plans').then(setPlans).catch(() => {});
+  }
+  useEffect(load, [reloadKey]);
+  useEffect(() => {
+    apiFetch<Area[]>('/admin/areas').then(setAreas).catch(() => {});
+  }, []);
+
+  async function remove(p: PlanItem) {
+    if (!confirm(`Excluir o plano "${p.name}"? Esta ação não pode ser desfeita.`)) return;
+    setBusy(true);
+    try {
+      await apiFetch(`/admin/plans/${p.id}`, { method: 'DELETE' });
+      load();
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (plans.length === 0) {
+    return <p className="text-sm text-muted-foreground">Nenhum plano combo criado ainda.</p>;
+  }
+
+  return (
+    <div className="flex flex-col divide-y divide-border">
+      {plans.map((p) =>
+        editing === p.id ? (
+          <PlanEditor
+            key={p.id}
+            plan={p}
+            areas={areas}
+            onDone={(changed) => {
+              setEditing(null);
+              if (changed) {
+                load();
+                onChanged();
+              }
+            }}
+          />
+        ) : (
+          <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">
+                {p.name} {!p.active && <span className="text-xs text-muted-foreground">(inativo)</span>}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {brl(p.priceBRL)}/mês · {p.areas.map((a) => a.name).join(', ') || 'sem áreas'}
+                {subscribersByName[p.name] != null ? ` · ${subscribersByName[p.name]} assinante(s)` : ''}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setEditing(p.id)}>
+                Editar
+              </Button>
+              <Button size="sm" variant="outline" disabled={busy} onClick={() => remove(p)} className="text-accent">
+                Excluir
+              </Button>
+            </div>
+          </div>
+        ),
+      )}
+    </div>
+  );
+}
+
+function PlanEditor({
+  plan,
+  areas,
+  onDone,
+}: {
+  plan: PlanItem;
+  areas: Area[];
+  onDone: (changed: boolean) => void;
+}) {
+  const [name, setName] = useState(plan.name);
+  const [price, setPrice] = useState(String(plan.priceBRL));
+  const [cases, setCases] = useState(String(plan.casesPerMonth));
+  const [active, setActive] = useState(plan.active);
+  const [selected, setSelected] = useState<Set<string>>(new Set(plan.areas.map((a) => a.id)));
+  const [busy, setBusy] = useState(false);
+
+  function toggle(id: string) {
+    setSelected((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  }
+
+  async function save() {
+    setBusy(true);
+    try {
+      await apiFetch(`/admin/plans/${plan.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name,
+          priceBRL: Number(price),
+          casesPerMonth: Number(cases || 0),
+          areaIds: [...selected],
+          active,
+        }),
+      });
+      onDone(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-4">
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome" />
+        <Input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Preço/mês" />
+        <Input type="number" value={cases} onChange={(e) => setCases(e.target.value)} placeholder="Casos/mês" />
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Plano ativo
+        </label>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {areas.map((a) => (
+          <button
+            type="button"
+            key={a.id}
+            onClick={() => toggle(a.id)}
+            className={cn(
+              'rounded-full border px-3 py-1 text-sm transition-colors',
+              selected.has(a.id) ? 'border-accent bg-accent/15 text-foreground' : 'border-border text-muted-foreground hover:bg-muted',
+            )}
+          >
+            {a.name}
+          </button>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <Button size="sm" disabled={busy} onClick={save}>
+          {busy ? <Spinner /> : 'Salvar'}
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => onDone(false)}>
+          Cancelar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+interface DayPayments {
+  date: string;
+  total: number;
+  count: number;
+  payments: Array<{ id: string; payer: string | null; amount: number; method: string; paidAt: string | null }>;
+}
+
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function RevenueHistory() {
+  const [date, setDate] = useState(todayISO());
+  const [data, setData] = useState<DayPayments | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  function load(d: string) {
+    setBusy(true);
+    apiFetch<DayPayments>(`/admin/finance/payments?date=${d}`)
+      .then(setData)
+      .catch(() => {})
+      .finally(() => setBusy(false));
+  }
+  useEffect(() => {
+    load(date);
+  }, [date]);
+
+  return (
+    <Card>
+      <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
+        <div>
+          <CardTitle className="text-base">Histórico de receita</CardTitle>
+          <p className="text-sm text-muted-foreground">Somente o que entrou (pagamentos recebidos) no dia.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-9 w-40" />
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => load(date)} title="Atualizar o dia selecionado">
+            {busy ? <Spinner /> : '↻ Atualizar'}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!data ? (
+          <Spinner className="text-muted-foreground" />
+        ) : data.payments.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Nenhuma receita em {new Date(`${date}T00:00:00`).toLocaleDateString('pt-BR')}.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm">
+              Total do dia:{' '}
+              <span className="font-serif text-xl tracking-tightish text-emerald-400">{brl(data.total)}</span>{' '}
+              <span className="text-muted-foreground">({data.count} pagamento(s))</span>
+            </p>
+            <div className="flex flex-col divide-y divide-border">
+              {data.payments.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-4 py-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate">{p.payer ?? '—'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {p.method}
+                      {p.paidAt ? ` · ${new Date(p.paidAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                    </p>
+                  </div>
+                  <span className="tabular-nums text-emerald-400">+ {brl(p.amount)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </CardContent>
