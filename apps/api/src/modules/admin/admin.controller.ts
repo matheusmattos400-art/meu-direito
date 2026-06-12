@@ -37,6 +37,13 @@ export class AdminController {
     return this.admin.listLawyers().then((data) => ({ data }));
   }
 
+  @Get('lawyers/pending')
+  @RequireScope('ADVOGADOS')
+  @ApiOperation({ summary: 'Fila de pré-cadastro (advogados aguardando verificação, com documentos).' })
+  pendingLawyers() {
+    return this.admin.pendingLawyers().then((data) => ({ data }));
+  }
+
   @Post('lawyers')
   @RequireScope('ADVOGADOS')
   @ApiOperation({ summary: 'Cria um advogado diretamente (com login e senha).' })

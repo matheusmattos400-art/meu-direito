@@ -45,6 +45,44 @@ export class AdminService {
     }));
   }
 
+  /** Fila de pré-cadastro: advogados aguardando verificação (com documentos). */
+  async pendingLawyers() {
+    const lawyers = await this.prisma.lawyer.findMany({
+      where: { status: { in: ['PRE_REGISTRATION', 'IN_ANALYSIS'] } },
+      include: {
+        user: true,
+        specialties: { include: { category: true } },
+        verificationDocuments: true,
+      },
+      orderBy: { submittedAt: 'asc' },
+    });
+    return Promise.all(
+      lawyers.map(async (l) => ({
+        lawyerId: l.id,
+        name: l.user.fullName,
+        email: l.user.email,
+        cpf: l.cpf,
+        phone: l.phone,
+        oab: `${l.oabNumber}/${l.oabState}`,
+        state: l.oabState,
+        city: l.city,
+        avatarUrl: l.avatarUrl,
+        specialties: l.specialties.map((s) => s.category.name),
+        status: l.status,
+        termAccepted: l.termAccepted,
+        submittedAt: l.submittedAt,
+        documents: await Promise.all(
+          l.verificationDocuments.map(async (d) => ({
+            id: d.id,
+            kind: d.kind,
+            fileName: d.fileName,
+            downloadUrl: await this.storage.createDownloadUrl(d.storageKey),
+          })),
+        ),
+      })),
+    );
+  }
+
   /** Ficha completa do advogado (formulário + documentos com download). */
   async getLawyerDetail(lawyerId: string) {
     const l = await this.prisma.lawyer.findUnique({
