@@ -21,6 +21,7 @@ export class SupportService {
         requesterId: user.id,
         requesterRole: user.role,
         subject: dto.subject,
+        category: dto.category ?? null,
         messages: { create: { authorId: user.id, authorRole: user.role, body: dto.message } },
       },
     });
@@ -112,6 +113,7 @@ export class SupportService {
     return tickets.map((t) => ({
       id: t.id,
       subject: t.subject,
+      category: t.category,
       requesterName: t.requester.fullName ?? t.requester.email,
       requesterRole: t.requesterRole,
       status: t.status,
@@ -134,7 +136,85 @@ export class SupportService {
       t.requester.fullName ?? t.requester.email,
       t.requester.id,
     );
-    return { ...thread, currentLawyer: await this.currentLawyerFor(t.requester.id) };
+    return {
+      ...thread,
+      category: t.category,
+      requesterRole: t.requesterRole,
+      currentLawyer: await this.currentLawyerFor(t.requester.id),
+    };
+  }
+
+  /**
+   * Resolve "pelo sistema" um chamado de acesso/pagamento: reativa a conta do
+   * solicitante (e, se advogado, reativa o status e garante assinatura vigente),
+   * registra a ação no chat e marca o chamado como resolvido.
+   */
+  async resolveSystem(admin: User, ticketId: string) {
+    const ticket = await this.prisma.supportTicket.findUnique({
+      where: { id: ticketId },
+      include: { requester: true },
+    });
+    if (!ticket) throw new NotFoundException('Chamado não encontrado.');
+
+    const actions: string[] = [];
+
+    // Reativa a conta do usuário, se suspensa.
+    if (ticket.requester.status !== 'ACTIVE') {
+      await this.prisma.user.update({ where: { id: ticket.requesterId }, data: { status: 'ACTIVE' } });
+      actions.push('conta reativada');
+    }
+
+    // Se for advogado: reativa o cadastro e garante assinatura vigente.
+    const lawyer = await this.prisma.lawyer.findUnique({ where: { userId: ticket.requesterId } });
+    if (lawyer) {
+      if (lawyer.status !== 'ACTIVE') {
+        await this.prisma.lawyer.update({ where: { id: lawyer.id }, data: { status: 'ACTIVE' } });
+        actions.push('acesso de advogado reativado');
+      }
+      const now = new Date();
+      const sub = await this.prisma.subscription.findFirst({
+        where: { lawyerUserId: ticket.requesterId },
+        orderBy: { createdAt: 'desc' },
+      });
+      const vigente = sub?.status === 'ACTIVE' && !!sub.currentPeriodEnd && sub.currentPeriodEnd > now;
+      if (!vigente) {
+        const until = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        if (sub) {
+          await this.prisma.subscription.update({
+            where: { id: sub.id },
+            data: { status: 'ACTIVE', currentPeriodStart: now, currentPeriodEnd: until, canceledAt: null },
+          });
+        } else {
+          await this.prisma.subscription.create({
+            data: { lawyerUserId: ticket.requesterId, status: 'ACTIVE', gateway: 'manual', currentPeriodStart: now, currentPeriodEnd: until },
+          });
+        }
+        actions.push('assinatura regularizada por 30 dias');
+      }
+    }
+
+    const resumo = actions.length ? actions.join('; ') : 'nenhuma ação necessária (já estava ativo)';
+    await this.prisma.supportMessage.create({
+      data: {
+        ticketId,
+        authorId: admin.id,
+        authorRole: 'ADMIN',
+        body: `✅ Resolvido pelo sistema: ${resumo}.`,
+      },
+    });
+    await this.prisma.supportTicket.update({
+      where: { id: ticketId },
+      data: { status: 'RESOLVED', assignedAdminId: admin.id, lastMessageAt: new Date() },
+    });
+    await this.audit.log({
+      actorId: admin.id,
+      actorRole: 'ADMIN',
+      action: 'SUPPORT_RESOLVE_SYSTEM',
+      entityType: 'SupportTicket',
+      entityId: ticketId,
+      metadata: { actions },
+    });
+    return { ok: true, actions };
   }
 
   async setStatus(admin: User, id: string, status: SupportStatus) {

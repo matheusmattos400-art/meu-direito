@@ -17,6 +17,7 @@ import {
 } from '@app/ui';
 import { apiFetch, ApiError } from '@/lib/api';
 import { getSupabaseBrowser } from '@/lib/supabase';
+import { SUPPORT_CATEGORIES } from '@app/validation';
 
 interface TicketSummary {
   id: string;
@@ -132,8 +133,18 @@ export default function SuportePage() {
 function NewTicket({ onCreated }: { onCreated: (id: string) => void }) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const [category, setCategory] = useState('');
+  const [role, setRole] = useState<'LAWYER' | 'CITIZEN' | 'ADMIN'>('CITIZEN');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiFetch<{ role: 'LAWYER' | 'CITIZEN' | 'ADMIN' }>('/me')
+      .then((m) => setRole(m.role))
+      .catch(() => {});
+  }, []);
+
+  const cats = SUPPORT_CATEGORIES.filter((c) => c.audience === 'BOTH' || c.audience === role);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -142,10 +153,11 @@ function NewTicket({ onCreated }: { onCreated: (id: string) => void }) {
     try {
       const res = await apiFetch<{ id: string }>('/support/tickets', {
         method: 'POST',
-        body: JSON.stringify({ subject, message }),
+        body: JSON.stringify({ subject, message, category: category || undefined }),
       });
       setSubject('');
       setMessage('');
+      setCategory('');
       onCreated(res.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao abrir chamado.');
@@ -162,6 +174,19 @@ function NewTicket({ onCreated }: { onCreated: (id: string) => void }) {
       </CardHeader>
       <CardContent>
         <form onSubmit={submit} className="flex flex-col gap-3">
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            required
+            className="h-10 rounded-md border border-input bg-transparent px-3 text-sm"
+          >
+            <option value="">Categoria do chamado…</option>
+            {cats.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.label}
+              </option>
+            ))}
+          </select>
           <Input placeholder="Assunto (ex.: erro ao enviar documento)" value={subject} onChange={(e) => setSubject(e.target.value)} required />
           <Textarea rows={4} placeholder="Descreva o problema ou a reclamação sobre o app..." value={message} onChange={(e) => setMessage(e.target.value)} required />
           <div className="flex items-center gap-3">

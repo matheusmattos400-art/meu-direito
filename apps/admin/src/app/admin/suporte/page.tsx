@@ -5,10 +5,14 @@ import Link from 'next/link';
 import { Badge, Card, CardContent, Spinner } from '@app/ui';
 import { apiFetch } from '@/lib/api';
 import { STATUS_META } from '@/lib/support-status';
+import { SUPPORT_CATEGORIES } from '@app/validation';
+
+const CAT_LABEL: Record<string, string> = Object.fromEntries(SUPPORT_CATEGORIES.map((c) => [c.code, c.label]));
 
 interface Ticket {
   id: string;
   subject: string;
+  category: string | null;
   requesterName: string | null;
   requesterRole: 'CITIZEN' | 'LAWYER' | 'ADMIN';
   status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
@@ -139,9 +143,16 @@ export default function SuporteAdminPage() {
                         {new Date(t.lastMessageAt).toLocaleString('pt-BR')}
                       </p>
                     </div>
-                    <Badge variant={st.variant} dot>
-                      {st.label}
-                    </Badge>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {t.category && (
+                        <span className="hidden rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground sm:inline">
+                          {CAT_LABEL[t.category] ?? t.category}
+                        </span>
+                      )}
+                      <Badge variant={st.variant} dot>
+                        {st.label}
+                      </Badge>
+                    </div>
                   </CardContent>
                 </Card>
               </Link>

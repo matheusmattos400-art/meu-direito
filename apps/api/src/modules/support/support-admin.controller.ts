@@ -93,6 +93,12 @@ export class SupportAdminController {
     return this.support.cancelLawyer(user, id).then((data) => ({ data }));
   }
 
+  @Post('tickets/:id/resolve-system')
+  @ApiOperation({ summary: 'Resolve pelo sistema (reativa acesso/assinatura) e fecha o chamado.' })
+  resolveSystem(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.support.resolveSystem(user, id).then((data) => ({ data }));
+  }
+
   @Post('tickets/:id/grant-access')
   @ApiOperation({ summary: 'Libera acesso do advogado por 7/30/60 dias.' })
   grantAccess(

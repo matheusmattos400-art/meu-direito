@@ -111,8 +111,31 @@ export type SetAdminScopesInput = z.infer<typeof setAdminScopesSchema>;
 export const openTicketSchema = z.object({
   subject: z.string().min(3, 'Descreva o assunto.').max(160),
   message: z.string().min(1, 'Escreva sua mensagem.').max(5000),
+  category: z.string().max(40).optional(),
 });
 export type OpenTicketInput = z.infer<typeof openTicketSchema>;
+
+/**
+ * Categorias de chamado do suporte. `audience`: quem vê (LAWYER/CITIZEN/BOTH).
+ * `system: true` = o admin pode resolver com um clique (ação automatizada).
+ */
+export const SUPPORT_CATEGORIES = [
+  { code: 'acesso', label: 'Acesso e login', audience: 'BOTH', system: true },
+  { code: 'pagamento', label: 'Plano e pagamento', audience: 'LAWYER', system: true },
+  { code: 'verificacao', label: 'Cadastro e verificação', audience: 'LAWYER', system: false },
+  { code: 'areas', label: 'Áreas de atuação', audience: 'LAWYER', system: false },
+  { code: 'chamadas', label: 'Chamadas e clientes', audience: 'LAWYER', system: false },
+  { code: 'processos', label: 'Processos e consultas', audience: 'BOTH', system: false },
+  { code: 'peticao', label: 'Petições e IA', audience: 'LAWYER', system: false },
+  { code: 'documentos', label: 'Documentos e anexos', audience: 'BOTH', system: false },
+  { code: 'perfil', label: 'Perfil e dados (LGPD)', audience: 'BOTH', system: false },
+  { code: 'tecnico', label: 'Problema técnico', audience: 'BOTH', system: false },
+  { code: 'duvida', label: 'Dúvida de uso', audience: 'BOTH', system: false },
+  { code: 'outro', label: 'Outro', audience: 'BOTH', system: false },
+] as const;
+
+export type SupportCategoryCode = (typeof SUPPORT_CATEGORIES)[number]['code'];
+export const SYSTEM_CATEGORY_CODES: string[] = SUPPORT_CATEGORIES.filter((c) => c.system).map((c) => c.code);
 
 /** Mensagem em um chamado de suporte (texto e/ou anexo). */
 export const ticketMessageSchema = z

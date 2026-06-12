@@ -731,6 +731,7 @@ model SupportTicket {
   requester     User          @relation("TicketRequester", fields: [requesterId], references: [id])
   requesterRole UserRole // snapshot: LAWYER ou CITIZEN (público)
   subject       String
+  category      String? // categoria do chamado (acesso, pagamento, processos…)
   status        SupportStatus @default(OPEN)
   assignedAdminId String?
   assignedAdmin   User?       @relation("TicketAssignee", fields: [assignedAdminId], references: [id])

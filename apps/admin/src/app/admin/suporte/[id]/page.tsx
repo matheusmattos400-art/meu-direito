@@ -7,6 +7,9 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Spinner
 import { apiFetch } from '@/lib/api';
 import { getSupabaseBrowser } from '@/lib/supabase';
 import { STATUS_META } from '@/lib/support-status';
+import { SUPPORT_CATEGORIES, SYSTEM_CATEGORY_CODES } from '@app/validation';
+
+const CAT_LABEL: Record<string, string> = Object.fromEntries(SUPPORT_CATEGORIES.map((c) => [c.code, c.label]));
 
 interface Attachment {
   name: string | null;
@@ -29,6 +32,7 @@ interface CurrentLawyer {
 interface Thread {
   id: string;
   subject: string;
+  category: string | null;
   status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
   requesterName: string | null;
   requesterRole: string;
@@ -126,6 +130,20 @@ export default function AdminTicketPage() {
     }
   }
 
+  async function resolveSystem() {
+    if (!confirm('Resolver pelo sistema? Vou reativar o acesso/assinatura do solicitante e fechar o chamado.')) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch(`/admin/support/tickets/${id}/resolve-system`, { method: 'POST' });
+      await fetchThread();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao resolver.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function grantAccess(days: number) {
     setBusy(true);
     setError(null);
@@ -175,11 +193,25 @@ export default function AdminTicketPage() {
               <h1 className="font-serif text-2xl tracking-tightish">{thread.subject}</h1>
               <p className="text-sm text-muted-foreground">
                 {thread.requesterName} · {thread.requesterRole === 'LAWYER' ? 'Advogado' : 'Público'}
+                {thread.category ? ` · ${CAT_LABEL[thread.category] ?? thread.category}` : ''}
               </p>
             </div>
             <Badge variant={st.variant} dot>{st.label}</Badge>
           </div>
         </div>
+
+        {/* Ação de sistema: resolve com um clique (acesso/pagamento) */}
+        {thread.category && SYSTEM_CATEGORY_CODES.includes(thread.category) && thread.status !== 'RESOLVED' && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/40 bg-accent/10 px-4 py-3">
+            <p className="text-sm">
+              <strong>Problema de sistema</strong> ({CAT_LABEL[thread.category] ?? thread.category}). Posso
+              reativar o acesso/assinatura e fechar o chamado.
+            </p>
+            <Button size="sm" disabled={busy} onClick={resolveSystem}>
+              {busy ? <Spinner /> : '⚡ Resolver pelo sistema'}
+            </Button>
+          </div>
+        )}
 
         <Card>
           <CardContent className="flex max-h-[50vh] flex-col gap-3 overflow-y-auto py-4">
