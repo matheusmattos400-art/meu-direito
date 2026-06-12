@@ -185,11 +185,11 @@ function NewTicket({ onCreated }: { onCreated: (id: string) => void }) {
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             required
-            className="h-10 rounded-md border border-input bg-transparent px-3 text-sm"
+            className="h-10 rounded-md border border-input bg-transparent px-3 text-sm [color-scheme:dark]"
           >
-            <option value="">Categoria do chamado…</option>
+            <option value="" className="bg-background text-foreground">Categoria do chamado…</option>
             {cats.map((c) => (
-              <option key={c.code} value={c.code}>
+              <option key={c.code} value={c.code} className="bg-background text-foreground">
                 {c.label}
               </option>
             ))}

@@ -134,7 +134,7 @@ export default function NovoAdvogadoPage() {
               <select
                 value={form.gender}
                 onChange={(e) => set('gender', e.target.value)}
-                className="h-10 rounded-md border border-input bg-transparent px-3 text-sm"
+                className="h-10 rounded-md border border-input bg-transparent px-3 text-sm [color-scheme:dark]"
               >
                 <option value="">Não informar</option>
                 <option value="M">Masculino</option>
